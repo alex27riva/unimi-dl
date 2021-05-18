@@ -35,7 +35,7 @@ headers = {
 }
 
 get_credential_type_payload = {
-    "username": "zhifan.chen@studenti.unimi.it",
+    "username": "example@studenti.unimi.it",
     "isOtherIdpSupported": False,
     "checkPhones": False,
     "isRemoteNGCSupported": True,
@@ -54,15 +54,15 @@ get_credential_type_payload = {
 
 login_payload = {
     "i13": "0",
-    "login": "zhifan.chen@studenti.unimi.it",
-    "loginfmt": "zhifan.chen@studenti.unimi.it",
+    "login": "example@studenti.unimi.it",
+    "loginfmt": "example@studenti.unimi.it",
     "type": "11",
     "LoginOptions": "3",
     "lrt": "true",
     "lrtPartition": "prod2",
     "hisRegion": "eur1",
     "hisScaleUnit": "2",
-    "passwd": "Simone@2",
+    "passwd": "yourpw",
     "ps": "2",
     "psRNGCDefaultType": "",
     "psRNGCEntropy": "",
