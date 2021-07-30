@@ -5,6 +5,6 @@ COPY pyproject.toml pyproject.toml
 #TODO: remove deps and use requirements.txt or setup.cfg
 RUN pip3 install requests
 RUN pip3 install youtube-dl
-RUN pip3 install --use-feature=in-tree-build .
+RUN pip3 install --use-feature=in-tree-build . && pip3 uninstall `python3 setup.py --name` --yes
 COPY credentials.json /root/.local/share/unimi-dl/
 ENTRYPOINT ["python3", "-m", "unimi_dl"]
