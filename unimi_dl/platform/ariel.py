@@ -21,9 +21,9 @@ import logging
 import re
 import urllib.parse
 
-from typing import Union
+from typing import Union, Tuple
 from bs4 import BeautifulSoup
-from bs4.element import NavigableString, Tag
+from bs4.element import Tag
 import requests
 
 from .platform import Platform
@@ -40,7 +40,7 @@ def get_ariel_session(email: str, password: str) -> requests.Session:
     return s
 
 class ArielSessionManager:
-    """Manages Ariel's login session as singletons"""
+    """Manages Ariel's login session as singleton"""
 
     session = None # type: Union[None, requests.Session]
             
@@ -79,78 +79,72 @@ class Ariel(Platform):
             myof_endpoint = "https://ariel.unimi.it/Offerta/myof" #endpoint per la propria offerta formativa
             r = self.session.get(myof_endpoint)
 
-            page = BeautifulSoup(r.text, 'html.parser')
-            courses_table = page.find("table", class_="table")
+            self.courses = self._parse_courses(r.text)
+
+        return self.courses.copy()
+    
+    def _parse_courses(self, html: str) -> list[Course]:
+        """
+        Parses the html page corresponding to the accessible courses by the student
+        and retrieves the courses
+        """
+        courses = []
+
+        page = BeautifulSoup(html, 'html.parser')
+        courses_table = page.find("table", class_="table")
+        if isinstance(courses_table, Tag):
             projects = courses_table.find_all("div", class_="ariel-project")
             for project in projects:
-                self.courses.append(self._createCourse(project))
+                courses.append(self._createCourse(project))
+        else: #TODO: custom Exception
+            raise Exception("To handle")
 
-        return self.courses
+        return courses
 
-#    def getCourseAttachments(self, course: Course):
-#        """Creates a list of the links pointing to each attachments of the course 
-#        (be it a video or a common file)"""
-#
-#        endpoint = "/v5/frm3/ThreadList.aspx?name=contenuti"
-#        homepage = course.link + endpoint
-#
-#        r = self.session.get(url=homepage)
-#        page = BeautifulSoup(r.text, "html.parser")
-#        roomlist = page.find("tbody", class_="arielRoomList")
-#
-#        regexp = re.compile(r"ThreadList\.aspx\?fc=*")
-#        sections = roomlist.find_all(name="a", href=regexp)
-#        visited = {} # type: dict[str, bool]
-#        for section in sections:
-#            root = ArielNode(name=section.get_text(), link=section["href"])
-#            course.addSection(section_name=section.get_text(), root=root)
-#            visited[section["href"]] = True
-#            self.__exploreAll(visited=visited, root=root)
+    def _createCourse(self, div: Tag) -> Course:
+        """
+        Parses a `div` with `class` = ariel-project getting `teachers' name,
+        course's name, course's base root url and edition`
+        """
+        if "ariel-project" not in div["class"]: #TODO: customize exception
+            raise Exception("div class doesn't match 'ariel-project'. Maybe changed?")
 
-#    def __exploreAll(self, visited: dict[str, bool], root:ArielNode):
-#        def __exploreAllHelper(visited: dict[str, bool], node:ArielNode):
-#            if visited[node.link]:
-#                return
-#
-#            node.attachments
-#            pass
-#
-#        if visited[root.link]:
-#            return
-#
-#        r = self.session.get(root.link, allow_redirects=True)
-#        content_type = r.headers.get("content-type")
-#
-#        if 'text' in content_type.lower() or 'html' in content_type.lower():
-#            root.attachments = Attachment()
-#        else:
-#            downloadable = True
-#
-#        visited[root.link] = True
-#        __exploreAllHelper(visited=visited, node=root)
-#
-#    def __retrieveLinks(self, link: str) -> list[str]:
-#        return []
+        def findAllTeachersName(div: Tag) -> list[str]:
+            regexp = re.compile("/offerta/teacher/*") #find teachers' name
+            els = div.find_all("a", href=regexp)
+            teachers = []
+            for el in els:
+                teachers.append(el.get_text())
+            return teachers
 
+        def findCourseNameAndUrl(div: Tag) -> Tuple[str, str]:
+            regexp = re.compile("https://*") #find course's name and url
+            el = div.find("a", href=regexp)
+            if isinstance(el, Tag):
+                name = el.get_text()
+                href = el["href"]
+                if isinstance(href, list):
+                    raise Exception("href shouldn't be a list")
+                return name, href
+            else:
+                raise Exception("Error on finding course's name and url") #TODO: customize exception
 
-    def _createCourse(self, project) -> Course:
-        regexp = re.compile("/offerta/teacher/*") #find teacher's name
-        els = project.find_all("a", href=regexp)
-        teachers = []
-        for el in els:
-            teachers.append(el.get_text())
+        def findCourseEdition(div: Tag):
+            regexp = re.compile("tag bg-F") #find course's edition
+            el = div.find("span", class_=regexp)
+            edition = ""
 
-        regexp = re.compile("https://*") #find course's name and link
-        el = project.find("a", href=regexp)
-        name = el.get_text()
-        link = el["href"]
+            if isinstance(el, Tag):
+                if isinstance(el.parent, Tag):
+                    edition = el.parent.get_text()
 
+            return edition
+
+        teachers = findAllTeachersName(div)
+        name, url = findCourseNameAndUrl(div)
+        edition = findCourseEdition(div)
         
-        regexp = re.compile("tag bg-F") #find course's edition
-        el = project.find("span", class_=regexp)
-        edition = el.parent.get_text()
-        
-        return Course(name, teachers, link, edition)
+        return Course(name, teachers, url, edition)
 
     def get_manifests(self, url: str) -> dict[str, str]:
         self.logger.info("Getting video page")
@@ -169,10 +163,11 @@ class Ariel(Platform):
         return res
 
 class Attachment:
-    def __init__(self, name: str, link: str, section_name: str) -> None:
+    def __init__(self, name: str, link: str, section_name: str, description: str="") -> None:
         self.section_name = section_name
         self.name = name
         self.link = link
+        self.description = description
 
 class ArielNode:
     def __init__(self, name: str, link: str, session:requests.Session, parent:ArielNode=None) -> None:
@@ -186,7 +181,7 @@ class ArielNode:
         self.ariel = session
         self.name = name
         self.link = link
-        self.attachments = {} # type: dict[str, Attachment]
+        self.attachments = {} # type: dict[str, list[Attachment]]
         self.children = {} # type: dict[str, ArielNode]
 
         
@@ -200,10 +195,38 @@ class ArielNode:
             title = tr.h2.contents[2].get_text()
             postbody = tr.find("span", class_="postbody")
             description = ""
+            attachments = {}
+            videos = tr.find_all("video")
+            for video in videos:
+                type = video.source["type"]
+                if not type in attachments:
+                    attachments[type] = []
+
+                attachments[type].append(video.source["src"])
+
+            pdfs = tr.find_all("a", class_=["cmd", "filename"])
+
+            for pdf in pdfs:
+                if "pdf" not in attachments:
+                    attachments["pdf"] = []
+
+                if pdf.has_attr("href"):
+                    if pdf["href"] != "#":
+                        
+                        print("self.link = {link}".format(link=self.link))
+                        new_url = re.compile("frm3?*").sub("", self.link, count=1)
+                        new_url = self.link
+                        
+                        attachments["pdf"] = pdf["href"]
+                        print("new_url = {new_url} pdf = {pdf} name = {name}".format(pdf=pdf["href"], new_url=new_url, name=pdf.get_text())) 
+
             if postbody:
                 description = postbody.get_text()
-            print("title = {title} description = {description}".format(title=title, description=description))
-            return title
+            return {
+                "title": title,
+                "description": description,
+                "attachments": attachments
+            }
 
         page = BeautifulSoup(page_html, "html.parser")
         table = page.find("table", id="forum-rooms")
@@ -322,10 +345,11 @@ class Course:
 
                 for tr in trs:
                     a = tr.find("a")
-                    if a["href"]:
+                    if a.has_attr("href"):
                         new_url = self.link + api+ a["href"]
                         self._sections[a.get_text()] = ArielNode(
-                            a.get_text(), new_url, session=self.session)
+                            a.get_text(), new_url, session=self.session
+                        )
                     else:
                         pass
             else:
