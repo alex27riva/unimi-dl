@@ -21,12 +21,15 @@ import logging
 import re
 import urllib.parse
 
-from typing import Union, Tuple
+from typing import Type, Union, Tuple, Optional
 from bs4 import BeautifulSoup
-from bs4.element import Tag
+from bs4.element import NavigableString, Tag
 import requests
+from urllib.parse import urlparse
 
 from .platform import Platform
+
+API = "/v5/frm3/"
 
 def get_ariel_session(email: str, password: str) -> requests.Session:
     s = requests.Session()
@@ -170,7 +173,18 @@ class Attachment:
         self.description = description
 
 class ArielNode:
-    def __init__(self, name: str, link: str, session:requests.Session, parent:ArielNode=None) -> None:
+    """
+    It's an implementation of a tree
+
+    `self.root` is the root node of ArielNode
+    `self.parent` is the parent node of ArielNode: if it's root then is None
+    `self.name` is an identifier for the node
+    `self.url` is the url associated to the node
+    `self.base_url` is the base url of the node (the part till .it)
+    `self.attachments` is a list of the attachments of the node. At the first call of getAttachments ArielNode will try to retrieve all the attachments of the ArielNode and the children
+    `self.children` is a dictionary with the name and the ArielNode associated with it
+    """
+    def __init__(self, name: str, url: str, base_url: str, parent:ArielNode=None) -> None:
         if parent == None:
             self.root = self
             self.parent = None
@@ -178,10 +192,10 @@ class ArielNode:
             self.root = parent.root
             self.parent = parent
 
-        self.ariel = session
         self.name = name
-        self.link = link
-        self.attachments = {} # type: dict[str, list[Attachment]]
+        self.url = urlparse(url).geturl()
+        self.base_url = urlparse(base_url).geturl()
+        self.attachments = None
         self.children = {} # type: dict[str, ArielNode]
 
         
@@ -213,10 +227,10 @@ class ArielNode:
                 if pdf.has_attr("href"):
                     if pdf["href"] != "#":
                         
-                        print("self.link = {link}".format(link=self.link))
-                        new_url = re.compile("frm3?*").sub("", self.link, count=1)
-                        new_url = self.link
-                        
+                        print("self.url= {link}".format(link=self.url))
+                        regexp = re.compile("frm3.*")
+                        new_url = regexp.sub("", self.url, count=1)
+                        print("base_url = {url}".format(url=self.base_url))
                         attachments["pdf"] = pdf["href"]
                         print("new_url = {new_url} pdf = {pdf} name = {name}".format(pdf=pdf["href"], new_url=new_url, name=pdf.get_text())) 
 
@@ -251,49 +265,28 @@ class ArielNode:
 
     def _parseToTree(self):
 
-        session = self.ariel
-        r = session.get(self.link)
-        res = self._extractTableRow(r.text)
-#        page = BeautifulSoup(r.text, "html.parser")
-#        table = page.find("table", id="forum-rooms")
-#        trs = None
-#
-#        if table == None: # no forum-rooms
-#            table = page.find("table", id="forum-threads") # find forum-threads
-#            if table == None: # no forum-threads
-#                logging.getLogger(__name__).debug(msg="Non c'è niente")
-#                pass
-#            else: # found forum-threads
-#                if isinstance(table, Tag):
-#                    trs = table.find_all("tr", class_="sticky") # try find trs
-#                else:
-#                    trs = []
-#        else: # try find all forum-rooms
-#            if isinstance(table, Tag): # found
-#                trs = table.find_all("tr", id=re.compile("room-*"))
-#            else: # not found
-#                trs = []
-#        
-#        if trs != None:
-#            for tr in trs:
-#                print(tr.prettify())
-#                pass
-#            pass
+        html = getPageHtml(self.url)
+        table = findContentTable(html)
+        
+        trs = []
+        if isinstance(table, Tag):
+            trs = findAllTableRows(table)
 
-    def _parseThreadsTableRow(self, tr: Tag):
-        tr.findAll("h2", class_=["arielTitle", "arielStick"])
+        for tr in trs:
+            findAttachments(tr)
 
-    def _parseRoomsTableRow(self, tr: Tag):
-        tr.findAll("h2", class_=["arielTitle", "arielStick"])
-
-    def getAttachments(self):
-        self._parseToTree()
-        if not self.attachments:
+    def getAttachments(self) -> list[Attachment]:
+        if self.attachments is None:
+            self.attachments = [] # type: list[Attachment]
+            self._parseToTree()
             for child in self.children.values():
-                child._parseToTree()
+                self.attachments = child.getAttachments() + self.attachments
 
-    def addChild(self, name: str, link: str):
-        self.children[name] = (ArielNode(name, link, session=self.ariel, parent=self))
+        return self.attachments.copy()
+
+    def addChild(self, name: str, url: str):
+        self.children[name] = (ArielNode(
+            name=name, url=url, base_url=self.base_url, parent=self))
         return True
 
 class Course:
@@ -307,10 +300,10 @@ class Course:
 
     It allows you to retrieve all the attachments of the said course (be it a video or pdfs)"""
 
-    def __init__(self, name: str, teachers: list[str], link: str, edition: str) -> None:
+    def __init__(self, name: str, teachers: list[str], base_url: str, edition: str) -> None:
         self._name = name
         self._teachers = teachers
-        self._link = link
+        self._base_url = base_url
         self._edition = edition
         self._sections = {} # type: dict[str, ArielNode]
         self._session = ArielSessionManager.getSession()
@@ -324,8 +317,8 @@ class Course:
         return self._teachers
         
     @property
-    def link(self):
-        return self._link
+    def base_url(self):
+        return self._base_url
 
     @property
     def edition(self):
@@ -334,29 +327,34 @@ class Course:
     @property
     def sections(self):
         if not self._sections:
-            api = "/v5/frm3/"
             endpoint = "ThreadList.aspx?name=contenuti"
-            url = self.link + api + endpoint
+            url = self.base_url + API + endpoint
             r = ArielSessionManager.getSession().get(url)
-            page = BeautifulSoup(r.text, "html.parser")
-            tbody = page.find("tbody", class_="arielRoomList")
-            if isinstance(tbody, Tag):
-                trs = tbody.find_all("tr")
+            table = findArielRoomTable(r.text)
 
-                for tr in trs:
-                    a = tr.find("a")
-                    if a.has_attr("href"):
-                        new_url = self.link + api+ a["href"]
-                        self._sections[a.get_text()] = ArielNode(
-                            a.get_text(), new_url, session=self.session
-                        )
-                    else:
-                        pass
-            else:
-                pass
-            #page.find_all()
+            if table == None:
+                return
 
-        return self._sections
+            trs = findAllTableRows(table)
+
+            for tr in trs:
+                a = tr.find("a")
+                if isinstance(a, Tag):
+                    href = a.get("href")
+
+                    if isinstance(href, list):
+                        raise Exception("href shouldn't be list")
+                    if href is None:
+                        raise Exception("href shouldn't be None")
+                    new_url = self.base_url + API + href
+                    name = a.get_text()
+
+                    self._sections[name] = ArielNode(
+                        name=name,
+                        url=new_url,
+                        base_url=self.base_url
+                    )
+        return self._sections.copy()
 
     @property
     def session(self):
@@ -377,10 +375,108 @@ class Course:
                 section_child.getAttachments()
 
         attachments = []
-        if section in self.sections:
+        if self.sections is not None and section in self.sections:
             getSectionAttachmentsHelper(self.sections.get(section))
         return attachments
 
     def __str__(self) -> str:
         return "Corso di '{name}' di '{teachers}' edizione '{edition}'".format(
             name=self.name, teachers=self.teachers, edition=self.edition)
+
+def findContentTable(html: str) -> Optional[Tag]:
+    page = BeautifulSoup(html, "html.parser")
+    tag = page.find("tbody")
+    if isinstance(tag, NavigableString):
+        return None
+
+    return tag
+
+def findArielThreadList(html: str) -> Optional[Tag]:
+    """
+    Retrieves table containing "ariel's rooms" which can be subsections containing other rooms
+    """
+    page = BeautifulSoup(html, "html.parser")
+    tag = page.find("tbody", id="threadList", class_="arielThreadList")
+    if not isinstance(tag, Tag) and not tag is None:
+        raise Exception("Not a Tag instance. Maybe changed?")
+    return tag
+
+def findArielRoomTable(html: str) -> Optional[Tag]:
+    """
+    Retrieves table containing "ariel's rooms" which can be subsections containing other rooms
+    """
+    page = BeautifulSoup(html, "html.parser")
+    tag = page.find("tbody", id="roomList", class_="arielRoomList")
+    if not isinstance(tag, Tag) and not tag is None:
+        raise Exception("Not a Tag instance. Maybe changed?")
+    return tag
+
+def findAllTableRows(table: Tag) -> list[Tag]:
+    result = []
+    trs = table.find_all("tr")
+    for tr in trs:
+        if isinstance(tr, Tag):
+            result.append(tr)
+    return result
+
+def findAttachments(tr: Tag) -> list[Attachment]:
+    attachments = []
+    attachments = attachments + findAllVideos(tr)
+    return attachments
+
+def findAllVideos(tr: Tag) -> list[Attachment]:
+    attachments = []
+    videos = tr.find_all("video")
+    for video in videos:
+        name = findMessageTitle(tr)
+        link = ""
+        if isinstance(video, Tag):
+            link = findVideoUrl(video)
+        section_name = ""
+        description = findPostDescription(tr)
+        attachments.append(Attachment(
+            name=name,
+            link=link,
+            section_name=section_name,
+            description=description
+        ))
+
+    return attachments
+
+def findVideoUrl(video: Tag) -> str:
+    url = ""
+    source = video.find("source")
+    if source is None or isinstance(source, NavigableString):
+        return url
+    url = source.get("src") 
+    if isinstance(url, list):
+        raise Exception("Video url shouldn't be a list")
+
+    if url is None:
+        url = ""
+
+    return url
+
+def findPostDescription(tr: Tag) -> str:
+    description = ""
+    div = tr.find("div", class_="arielMessageBody")
+
+    if isinstance(div, Tag):
+        description = div.get_text()
+
+    return description
+
+def findMessageTitle(tr: Tag) -> str:
+    title = ""
+    h2 = tr.find("h2", class_=["arielTitle", "arielStick"])
+    if isinstance(h2, Tag):
+        spans = h2.select("span")
+        for span in spans: #title should be the last `span` tag
+            title = span.get_text()
+    return title
+
+def getPageHtml(url: str) -> str:
+    session = ArielSessionManager.getSession()
+    r = session.get(url)
+    r.raise_for_status()
+    return r.text
