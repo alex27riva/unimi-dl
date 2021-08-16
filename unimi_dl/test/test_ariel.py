@@ -40,9 +40,14 @@ class TestAriel(unittest.TestCase):
         courses = ariel.get_courses()
         course = courses[0]
         for section_name in course.getAvailableSections():
+            print(section_name)
             assert(isinstance(section_name, str))
             assert(section_name != "")
-            course.getSectionAttachments(section_name)
+            attachments = course.getSectionAttachments(section_name)
+#            for attachment in attachments:
+#                print(attachment)
+            if section_name == "Esame":
+                print(attachments)
 
     def test_ariel_course_create(self) -> None:
         

@@ -21,7 +21,7 @@ import logging
 import re
 import urllib.parse
 
-from typing import Type, Union, Tuple, Optional
+from typing import Union, Tuple, Optional
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 import requests
@@ -98,9 +98,10 @@ class Ariel(Platform):
         if isinstance(courses_table, Tag):
             projects = courses_table.find_all("div", class_="ariel-project")
             for project in projects:
-                courses.append(self._createCourse(project))
+                if isinstance(project, Tag):
+                    courses.append(self._createCourse(project))
         else: #TODO: custom Exception
-            raise Exception("To handle")
+            raise Exception("Error while parsing courses. Maybe Tag changed?")
 
         return courses
 
@@ -166,11 +167,18 @@ class Ariel(Platform):
         return res
 
 class Attachment:
-    def __init__(self, name: str, link: str, section_name: str, description: str="") -> None:
+    def __init__(self, name: str, url: str, section_name: str, description: str="") -> None:
         self.section_name = section_name
         self.name = name
-        self.link = link
+        self.url = urlparse(url).geturl()
         self.description = description
+
+
+    def __repr__(self) -> str:
+        return "{name}".format(name=self.name)
+
+    def __str__(self) -> str:
+        return "{name}".format(name=self.name)
 
 class ArielNode:
     """
@@ -218,22 +226,6 @@ class ArielNode:
 
                 attachments[type].append(video.source["src"])
 
-            pdfs = tr.find_all("a", class_=["cmd", "filename"])
-
-            for pdf in pdfs:
-                if "pdf" not in attachments:
-                    attachments["pdf"] = []
-
-                if pdf.has_attr("href"):
-                    if pdf["href"] != "#":
-                        
-                        print("self.url= {link}".format(link=self.url))
-                        regexp = re.compile("frm3.*")
-                        new_url = regexp.sub("", self.url, count=1)
-                        print("base_url = {url}".format(url=self.base_url))
-                        attachments["pdf"] = pdf["href"]
-                        print("new_url = {new_url} pdf = {pdf} name = {name}".format(pdf=pdf["href"], new_url=new_url, name=pdf.get_text())) 
-
             if postbody:
                 description = postbody.get_text()
             return {
@@ -270,10 +262,10 @@ class ArielNode:
         
         trs = []
         if isinstance(table, Tag):
-            trs = findAllTableRows(table)
+            trs = findTableAllRows(table)
 
         for tr in trs:
-            findAttachments(tr)
+            self.attachments = findAllAttachments(tr) + self.attachments
 
     def getAttachments(self) -> list[Attachment]:
         if self.attachments is None:
@@ -325,17 +317,18 @@ class Course:
         return self.edition
 
     @property
-    def sections(self):
+    def sections(self) -> dict[str, ArielNode]:
         if not self._sections:
             endpoint = "ThreadList.aspx?name=contenuti"
             url = self.base_url + API + endpoint
-            r = ArielSessionManager.getSession().get(url)
-            table = findArielRoomTable(r.text)
+            html = getPageHtml(url)
+            table = findContentTable(html)
 
             if table == None:
-                return
+                self._sections = {}
+                return self._sections
 
-            trs = findAllTableRows(table)
+            trs = findTableAllRows(table)
 
             for tr in trs:
                 a = tr.find("a")
@@ -354,6 +347,7 @@ class Course:
                         url=new_url,
                         base_url=self.base_url
                     )
+
         return self._sections.copy()
 
     @property
@@ -369,14 +363,13 @@ class Course:
     def getSectionAttachments(self, section: str) -> list[Attachment]:
         """Retrieves all the attachments of a section"""
 
-        def getSectionAttachmentsHelper(section_tree: ArielNode):
-            section_tree.getAttachments()
-            for section_child in section_tree.children.values():
-                section_child.getAttachments()
-
         attachments = []
-        if self.sections is not None and section in self.sections:
-            getSectionAttachmentsHelper(self.sections.get(section))
+        ariel_node = self.sections.get(section)
+        if ariel_node is not None:
+            section_tree = self.sections.get(section)
+            if section_tree is not None:
+                print(section_tree.getAttachments())
+                attachments = attachments + section_tree.getAttachments()
         return attachments
 
     def __str__(self) -> str:
@@ -391,27 +384,7 @@ def findContentTable(html: str) -> Optional[Tag]:
 
     return tag
 
-def findArielThreadList(html: str) -> Optional[Tag]:
-    """
-    Retrieves table containing "ariel's rooms" which can be subsections containing other rooms
-    """
-    page = BeautifulSoup(html, "html.parser")
-    tag = page.find("tbody", id="threadList", class_="arielThreadList")
-    if not isinstance(tag, Tag) and not tag is None:
-        raise Exception("Not a Tag instance. Maybe changed?")
-    return tag
-
-def findArielRoomTable(html: str) -> Optional[Tag]:
-    """
-    Retrieves table containing "ariel's rooms" which can be subsections containing other rooms
-    """
-    page = BeautifulSoup(html, "html.parser")
-    tag = page.find("tbody", id="roomList", class_="arielRoomList")
-    if not isinstance(tag, Tag) and not tag is None:
-        raise Exception("Not a Tag instance. Maybe changed?")
-    return tag
-
-def findAllTableRows(table: Tag) -> list[Tag]:
+def findTableAllRows(table: Tag) -> list[Tag]:
     result = []
     trs = table.find_all("tr")
     for tr in trs:
@@ -419,9 +392,9 @@ def findAllTableRows(table: Tag) -> list[Tag]:
             result.append(tr)
     return result
 
-def findAttachments(tr: Tag) -> list[Attachment]:
+def findAllAttachments(tr: Tag) -> list[Attachment]:
     attachments = []
-    attachments = attachments + findAllVideos(tr)
+    attachments = attachments + findAllVideos(tr) + findAllDocuments(tr) 
     return attachments
 
 def findAllVideos(tr: Tag) -> list[Attachment]:
@@ -436,7 +409,7 @@ def findAllVideos(tr: Tag) -> list[Attachment]:
         description = findPostDescription(tr)
         attachments.append(Attachment(
             name=name,
-            link=link,
+            url=link,
             section_name=section_name,
             description=description
         ))
@@ -454,6 +427,40 @@ def findVideoUrl(video: Tag) -> str:
 
     if url is None:
         url = ""
+
+    return url
+
+def findAllDocuments(tr: Tag) -> list[Attachment]:
+    attachments = []
+    a_tags = tr.find_all("a", class_=["filename"])
+    for a in a_tags:
+        if not isinstance(a, Tag):
+            continue
+
+        name = findDocumentName(a)
+        url = findDocumentUrl(a)
+        section_name = ""
+        description = findPostDescription(tr)
+        attachments.append(Attachment(
+            name=name,
+            url=url,
+            section_name=section_name,
+            description=description
+        ))
+
+    return attachments
+
+def findDocumentName(a: Tag) -> str:
+    name = a.get_text()
+    print("name = {name}".format(name=name))
+
+    return name
+
+def findDocumentUrl(a: Tag) -> str:
+    url = ""
+    href = a.get("href")
+    if isinstance(href, str):
+        url = href
 
     return url
 
