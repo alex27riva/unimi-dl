@@ -167,12 +167,31 @@ class Ariel(Platform):
         return res
 
 class Attachment:
-    def __init__(self, name: str, url: str, section_name: str, description: str="") -> None:
+    def __init__(self, name: str, filetype: str, url: str, section_name: str, description: str="") -> None:
         self.section_name = section_name
         self.name = name
         self.url = urlparse(url).geturl()
         self.description = description
+        self.filetype = filetype
 
+    def download(self, path: str) -> bool:
+        success = False
+
+        print("type = {filetype}".format(filetype=self.filetype))
+        if self.filetype == "video":
+            print("Scaricando")
+            import youtube_dl
+            
+            ydl_opts = {
+                "v": "true",
+                "nocheckcertificate": "true",
+                "restrictfilenames": "true",
+                "logger": logging.getLogger("youtube-dl")
+            }
+            ydl_opts["outtmpl"] = path + self.name + ".%(ext)s"
+            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([self.url])
+        return success
 
     def __repr__(self) -> str:
         return "{name}".format(name=self.name)
@@ -205,56 +224,7 @@ class ArielNode:
         self.base_url = urlparse(base_url).geturl()
         self.attachments = None
         self.children = {} # type: dict[str, ArielNode]
-
         
-    def _extractTableRow(self, page_html: str):
-        def _extractFromRooms(tr: Tag):
-            title = tr.h2.contents[2].get_text()
-            print("title = {title}".format(title=title))
-            return title
-
-        def _extractFromThreads(tr: Tag):
-            title = tr.h2.contents[2].get_text()
-            postbody = tr.find("span", class_="postbody")
-            description = ""
-            attachments = {}
-            videos = tr.find_all("video")
-            for video in videos:
-                type = video.source["type"]
-                if not type in attachments:
-                    attachments[type] = []
-
-                attachments[type].append(video.source["src"])
-
-            if postbody:
-                description = postbody.get_text()
-            return {
-                "title": title,
-                "description": description,
-                "attachments": attachments
-            }
-
-        page = BeautifulSoup(page_html, "html.parser")
-        table = page.find("table", id="forum-rooms")
-        trs = []
-        res = []
-
-        if table: # try find rooms
-            if isinstance(table, Tag):
-                trs = table.find_all("tr", id=re.compile("room-*"))
-                print(table.prettify())
-                for tr in trs:
-                    res.append(_extractFromRooms(tr))
-
-        if not trs: # nothing found
-            table = page.find("table", id="forum-threads") # find forum-threads
-            if isinstance(table, Tag):
-                trs = table.find_all("tr", class_="sticky") # try find trs
-                for tr in trs:
-                    res.append(_extractFromThreads(tr))
-
-        return res
-
     def _parseToTree(self):
 
         html = getPageHtml(self.url)
@@ -411,7 +381,8 @@ def findAllVideos(tr: Tag) -> list[Attachment]:
             name=name,
             url=link,
             section_name=section_name,
-            description=description
+            description=description,
+            filetype="video"
         ))
 
     return attachments
@@ -445,14 +416,14 @@ def findAllDocuments(tr: Tag) -> list[Attachment]:
             name=name,
             url=url,
             section_name=section_name,
-            description=description
+            description=description,
+            filetype="document"
         ))
 
     return attachments
 
 def findDocumentName(a: Tag) -> str:
     name = a.get_text()
-    print("name = {name}".format(name=name))
 
     return name
 
