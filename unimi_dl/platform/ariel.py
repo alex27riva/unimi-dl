@@ -174,9 +174,10 @@ class Attachment:
         self.description = description
         self.filetype = filetype
 
-    def download(self, path: str) -> bool:
+    def download(self, path_prefix: str) -> bool:
         success = False
-
+        import os
+        path = os.path.join(path_prefix, self.name)
         if self.filetype == "video":
             print("Scaricando")
             import youtube_dl
@@ -187,9 +188,17 @@ class Attachment:
                 "restrictfilenames": "true",
                 "logger": logging.getLogger("youtube-dl")
             }
-            ydl_opts["outtmpl"] = path + self.name + ".%(ext)s"
+            ydl_opts["outtmpl"] = path + ".%(ext)s"
             with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([self.url])
+        elif self.filetype == "document":
+            session = ArielSessionManager.getSession()
+            r = session.get(self.url)
+            
+            with(open(path, "wb") as file):
+                file.write(r.content)
+        else:
+            raise NotImplementedError(f"{self.filetype} filetype download not supported")
         return success
 
     def __repr__(self) -> str:
@@ -236,7 +245,7 @@ class ArielNode:
             trs = findAllRows(table)
 
         for tr in trs:
-            self.attachments = findAllAttachments(tr) + self.attachments
+            self.attachments = findAllAttachments(tr, self.base_url) + self.attachments
 
     def getAttachments(self) -> list[Attachment]:
         if not self.has_retrieved:
@@ -362,9 +371,9 @@ def findAllRows(tbody: Tag) -> list[Tag]:
             result.append(tr)
     return result
 
-def findAllAttachments(tr: Tag) -> list[Attachment]:
+def findAllAttachments(tr: Tag, base_url: str) -> list[Attachment]:
     attachments = []
-    attachments = attachments + findAllVideos(tr) + findAllDocuments(tr) 
+    attachments = attachments + findAllVideos(tr) + findAllDocuments(tr, base_url) 
     return attachments
 
 def findAllVideos(tr: Tag) -> list[Attachment]:
@@ -408,7 +417,7 @@ def findVideoUrl(video: Tag) -> str:
 
     return url
 
-def findAllDocuments(tr: Tag) -> list[Attachment]:
+def findAllDocuments(tr: Tag, base_url: str) -> list[Attachment]:
     attachments = []
     a_tags = tr.find_all("a", class_=["filename"])
     for a in a_tags:
@@ -416,7 +425,7 @@ def findAllDocuments(tr: Tag) -> list[Attachment]:
             continue
 
         name = findDocumentName(a)
-        url = findDocumentUrl(a)
+        url = base_url + API + findDocumentUrl(a)[8:] #excluding ../frm3 from the url
         section_name = ""
         description = findPostDescription(tr)
         attachments.append(Attachment(
@@ -457,7 +466,8 @@ def findMessageTitle(tr: Tag) -> str:
     if isinstance(h2, Tag):
         spans = h2.select("span")
         for span in spans: #title should be the last `span` tag
-            title = span.get_text()
+            if isinstance(span, Tag):
+                title = span.get_text()
     return title
 
 def getPageHtml(url: str) -> str:
