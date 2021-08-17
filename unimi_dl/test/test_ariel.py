@@ -45,7 +45,7 @@ class TestAriel(unittest.TestCase):
             assert(section_name != "")
             attachments = course.getSectionAttachments(section_name)
             for attachment in attachments:
-                attachment.download("./")
+                attachment.download("./output/")
 
     def test_ariel_course_create(self) -> None:
         

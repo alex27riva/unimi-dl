@@ -177,7 +177,6 @@ class Attachment:
     def download(self, path: str) -> bool:
         success = False
 
-        print("type = {filetype}".format(filetype=self.filetype))
         if self.filetype == "video":
             print("Scaricando")
             import youtube_dl
@@ -232,7 +231,7 @@ class ArielNode:
         
         trs = []
         if isinstance(table, Tag):
-            trs = findTableAllRows(table)
+            trs = findAllRows(table)
 
         for tr in trs:
             self.attachments = findAllAttachments(tr) + self.attachments
@@ -298,7 +297,7 @@ class Course:
                 self._sections = {}
                 return self._sections
 
-            trs = findTableAllRows(table)
+            trs = findAllRows(table)
 
             for tr in trs:
                 a = tr.find("a")
@@ -354,9 +353,9 @@ def findContentTable(html: str) -> Optional[Tag]:
 
     return tag
 
-def findTableAllRows(table: Tag) -> list[Tag]:
+def findAllRows(tbody: Tag) -> list[Tag]:
     result = []
-    trs = table.find_all("tr")
+    trs = tbody.find_all("tr")
     for tr in trs:
         if isinstance(tr, Tag):
             result.append(tr)
@@ -368,18 +367,25 @@ def findAllAttachments(tr: Tag) -> list[Attachment]:
     return attachments
 
 def findAllVideos(tr: Tag) -> list[Attachment]:
+    """
+    Retrieves all the <video> in the `tr` abd creates an `Attachment` using:
+        `name`: extracts the name from the `url`, which is the `manifest.m3u8`
+        `url`: a http-valid url ending with `manifest.m3u8`
+        `description`: the description of the post in which the video is located
+        `filetype`: "video"
+    """
     attachments = []
     videos = tr.find_all("video")
     for video in videos:
-        name = findMessageTitle(tr)
-        link = ""
+        url = ""
         if isinstance(video, Tag):
-            link = findVideoUrl(video)
+            url = findVideoUrl(video)
+        name = (url.split(":")[2])[0:-14] #extracts the video name from the `manifest.m3u8`
         section_name = ""
         description = findPostDescription(tr)
         attachments.append(Attachment(
             name=name,
-            url=link,
+            url=url,
             section_name=section_name,
             description=description,
             filetype="video"
