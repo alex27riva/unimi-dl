@@ -221,8 +221,10 @@ class ArielNode:
         self.name = name
         self.url = urlparse(url).geturl()
         self.base_url = urlparse(base_url).geturl()
-        self.attachments = None
+        self.attachments = [] # type: list[Attachment]
         self.children = {} # type: dict[str, ArielNode]
+
+        self.has_retrieved = False #indicates if it already retrieved the available attachments
         
     def _parseToTree(self):
 
@@ -237,8 +239,7 @@ class ArielNode:
             self.attachments = findAllAttachments(tr) + self.attachments
 
     def getAttachments(self) -> list[Attachment]:
-        if self.attachments is None:
-            self.attachments = [] # type: list[Attachment]
+        if not self.has_retrieved:
             self._parseToTree()
             for child in self.children.values():
                 self.attachments = child.getAttachments() + self.attachments
