@@ -39,7 +39,7 @@ class TestAriel(unittest.TestCase):
         
         courses = ariel.get_courses()
         course = courses[0]
-        for section_name in course.getAvailableSections():
+        for section_name in course.getSections():
             print(section_name)
             assert(isinstance(section_name, str))
             assert(section_name != "")

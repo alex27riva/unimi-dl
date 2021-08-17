@@ -25,12 +25,12 @@ from urllib3 import disable_warnings
 import urllib.parse
 from urllib3.exceptions import InsecureRequestWarning
 
-from .ariel import get_ariel_session
+from .session_manager.unimi import UnimiSessionManager
 from .platform import Platform
 
 
 def get_panopto_session(email: str, password: str) -> requests.Session:
-    s = get_ariel_session(email, password)
+    s = UnimiSessionManager.getSession(email, password)
     auth_url = r"https://unimi.cloud.panopto.eu/Panopto/Pages/Auth/Login.aspx?instance=Labonline"
     disable_warnings(InsecureRequestWarning)
     s.get(auth_url, verify=False)
