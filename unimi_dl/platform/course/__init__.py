@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from urllib.parse import urlparse
 from typing import Optional
 from unimi_dl.platform.downloadable import Attachment
@@ -12,7 +14,16 @@ class Section:
         self.attachments = [] # type: list[Attachment]
         self.subsections = [] # type: list[Section]
 
+    def getAllAttachments(self) -> list[Attachment]:
+        """
+        Get all attachments from `self` and `self.subsections`
+        """
+        raise NotImplementedError
+
     def getAttachments(self) -> list[Attachment]:
+        raise NotImplementedError
+
+    def getSubsections(self) -> list[Section]:
         raise NotImplementedError
 
     def __repr__(self) -> str:

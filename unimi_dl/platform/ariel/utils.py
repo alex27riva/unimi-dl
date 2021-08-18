@@ -204,6 +204,30 @@ def findCourseEdition(div: Tag):
 
     return edition
 
+def findAllArielRoomsList(html: str) -> list[Tag]:
+    """
+    Finds all the `tbody` under "Sottoambienti"
+    """
+    rooms = []
+    page = BeautifulSoup(html, "html.parser")
+    tbodies = page.find_all("tbody", class_="arielRoomList")
+    for tbody in tbodies:
+        if isinstance(tbody, Tag):
+            rooms.append(tbody)
+    return rooms
+
+def findAllArielThreadList(html: str) -> list[Tag]:
+    """
+    Finds all the `tbody` under "Archivio file"
+    """
+    rooms = []
+    page = BeautifulSoup(html, "html.parser")
+    tbodies = page.find_all("tbody", class_="arielThreadList")
+    for tbody in tbodies:
+        if isinstance(tbody, Tag):
+            rooms.append(tbody)
+    return rooms
+
 def findAllSections(base_url: str) -> list[Section]:
     """
     Finds all the sections of a given course specified in `base_url`
@@ -211,7 +235,7 @@ def findAllSections(base_url: str) -> list[Section]:
     sections = []
     url = base_url + API + CONTENUTI
     html =  getPageHtml(url)
-    tables = findAllContentTables(html)
+    tables = findAllArielRoomsList(html)
 
     if tables == None:
         return sections

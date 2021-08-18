@@ -19,7 +19,6 @@
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from getpass import getpass
-from io import TextIOWrapper
 from json import dumps as json_dumps
 import logging
 import os
@@ -201,23 +200,29 @@ def main():
             entries = course.getSections()
             selected_sections = multi_select(entries, entries, "Scegli le sezioni: ") # type: list[Section]
 
-            attachments = []
+            choices = []
             for section in selected_sections:
-                attachments = section.getAttachments() + attachments 
+                cur_section = section
+                while len(cur_section.getSubsections()) > 0:
+                    choices = cur_section.getAttachments() + cur_section.getSubsections() # type: ignore
+                    print(choices)
+                    selected_choices = multi_select(
+                        entries=choices,
+                        entries_text=choices,
+                        selection_text="Scegli un file o una sezione ")
 
-            selected_attachments = multi_select(
-                entries=attachments,
-                entries_text=attachments,
-                selection_text="Scegli i file che vuoi scaricare ") # type: list[Attachment]
+                    for choice in selected_choices:
+                        if isinstance(choice, Attachment):
+                            if not opts.simulate:
+                                download_manager.doDownload(
+                                    attachment=choice,
+                                    dry_run=opts.add_to_downloaded_only,
+                                    path=opts.output,
+                                    platform=opts.platform
+                                )
 
-            for attachment in selected_attachments:
-                if not opts.simulate:
-                    download_manager.doDownload(
-                        attachment=attachment,
-                        dry_run=opts.add_to_downloaded_only,
-                        path=opts.output,
-                        platform=opts.platform
-                    )
+                        if isinstance(choice, Section):
+                            cur_section = choice
     else:
         pass
 
