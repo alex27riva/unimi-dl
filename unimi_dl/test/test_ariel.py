@@ -4,8 +4,6 @@ from ..platform import Ariel
 import os
 
 class TestAriel(unittest.TestCase):
-#    def __init__(self, methodName: str) -> None:
-#        super().__init__(methodName=methodName)
     def setUp(self) -> None:
         username = os.getenv("USERNAME")
         password = os.getenv("PASSWORD")
@@ -62,10 +60,6 @@ class TestAriel(unittest.TestCase):
 
             if document is not None:
                 document.download("./output/")
-
-    def test_ariel_course_create(self) -> None:
-        
-        pass
 
 if __name__ == '__main__':
     unittest.main()

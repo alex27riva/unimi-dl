@@ -121,7 +121,6 @@ def log_setup(verbose: bool, local: str) -> None:
 
 
 def get_credentials(credentials_path: str, ask: bool, save: bool) -> tuple[str, str]:
-    main_logger = logging.getLogger(__name__)
     email = None
     password = None
     creds = {}
