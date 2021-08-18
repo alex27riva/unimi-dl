@@ -56,7 +56,7 @@ class DownloadManager:
         If `dry_run` is True then the `attachment` is only added to the downloaded list but not effectively downloaded
         TODO: to change, need a better way to handle type hinting
         """
-        l = getattr(self.downloaded, platform) # list[str]
+        l = getattr(self.downloaded, platform) # type: list[str]
         if attachment.url not in l or force:
             if dry_run or attachment.download(path):
                 l.append(attachment.url)
@@ -72,11 +72,20 @@ class DownloadManager:
         with(self.path.open("w") as downloaded_file):
             downloaded_file.write(json_dumps(self.downloaded.__dict__))
 
-    def wipeDownloaded(self) -> None:
-        new_downloaded = Downloads()
-        with(self.path.open("w") as downloaded_file):
-            downloaded_file.write(json_dumps(new_downloaded.__dict__))
-        self.downloaded = new_downloaded
+    def wipeDownloaded(self, platform: str, to_removed: list[str]) -> None:
+        l = getattr(self.downloaded, platform) # type: list[str]
+        for entry in to_removed:
+            l.remove(entry)
+
+        setattr(self.downloaded, platform, l)
+        self.save()
+
+    def getDownloadFrom(self, platform: str) -> list[str]:
+        """
+        Gets a list of url of downloaded attachments
+        """
+        return getattr(self.downloaded, platform) # list[str]
+        
 
     def getDownloads(self) -> Downloads:
         return self.downloaded

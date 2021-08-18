@@ -1,8 +1,9 @@
 from bs4.element import Tag
 
-from unimi_dl.platform.downloadable import Attachment
 from unimi_dl.platform.course import Course
 from unimi_dl.platform.course import Section
+from unimi_dl.platform.downloadable import Attachment
+
 import unimi_dl.platform.ariel.utils as utils
 
 class ArielSection(Section):
@@ -18,8 +19,9 @@ class ArielSection(Section):
     `self.subsections` is a dictionary with the name and the Section associated with it
     """
     def __init__(self, name: str, url: str, base_url: str, parent_section = None) -> None:
+        if url.startswith("ThreadList.aspx"):
+            url = base_url + utils.API + url
         super().__init__(name=name, url=url, base_url=base_url, parent_section=parent_section)
-
         self.has_retrieved = False #indicates if it already retrieved the available attachments
         
     def _parseToTree(self):
@@ -27,27 +29,33 @@ class ArielSection(Section):
         TODO: doesn't parse subsections
         """
         html = utils.getPageHtml(self.url)
-        table = utils.findContentTable(html)
-        
-        trs = []
-        if isinstance(table, Tag):
-            trs = utils.findAllRows(table)
+        tables = utils.findAllContentTables(html)
 
-        for tr in trs:
-            self.attachments = utils.findAllAttachments(tr, self.base_url) + self.attachments
+        for table in tables:
+            if isinstance(table, Tag):
+                trs = utils.findAllRows(table)
+                t = utils.findTableType(table)
+                if t == "room": # get subsections
+                    for tr in trs:
+                        a_tags = utils.findAllATags(tr)
+                        for a in a_tags:
+                            href = a.get("href")
+                            if isinstance(href, str):
+                                self.addSection(name=a.get_text(), url=href)
+                if t == "thread":
+                    for tr in trs:
+                        self.attachments = self.attachments + utils.findAllAttachments(tr, self.base_url)
 
     def getAttachments(self) -> list[Attachment]:
         if not self.has_retrieved:
             self._parseToTree()
             for child in self.subsections:
-                self.attachments = child.getAttachments() + self.attachments
-
+                self.attachments = self.attachments + child.getAttachments()
             self.has_retrieved = True
-
         return self.attachments.copy()
 
-    def addChild(self, name: str, url: str):
-        self.subsections.append(Section(
+    def addSection(self, name: str, url: str):
+        self.subsections.append(ArielSection(
             name=name, url=url, base_url=self.base_url, parent_section=self))
         return True
 
@@ -58,37 +66,6 @@ class ArielCourse(Course):
 
     def getSections(self) -> list[Section]:
         if not self.sections:
-            self.sections = findAllSections(self.base_url)
+            self.sections = utils.findAllSections(self.base_url)
 
         return self.sections
-
-def findAllSections(base_url: str) -> list[Section]:
-    """
-    Finds all the sections of a given course specified in `base_url`
-    """
-    sections = []
-    url = base_url + utils.API + utils.CONTENUTI
-    html =  utils.getPageHtml(url)
-    table = utils.findContentTable(html)
-
-    if table == None:
-        return sections
-
-    trs = utils.findAllRows(table)
-
-    for tr in trs:
-        a = tr.find("a")
-        if isinstance(a, Tag):
-            href = utils.getTagHref(a)
-
-            if href == "":
-                raise Exception("href shouldn't be empty")
-
-            section_url = base_url + utils.API + href
-            name = a.get_text()
-
-            sections.append(ArielSection(
-                name=name,
-                url=section_url,
-                base_url=base_url))
-    return sections

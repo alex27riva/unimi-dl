@@ -15,13 +15,14 @@ API = "/v5/frm3/" #API version of ariel
 OFFERTA_FORMATIVA = "https://ariel.unimi.it/Offerta/myof" #offerta formativa
 CONTENUTI = "ThreadList.aspx?name=contenuti" #contents endpoint of a course
 
-def findContentTable(html: str) -> Optional[Tag]:
+def findAllContentTables(html: str) -> list[Tag]:
+    result = []
     page = BeautifulSoup(html, "html.parser")
-    tag = page.find("tbody")
-    if isinstance(tag, NavigableString):
-        return None
-
-    return tag
+    tbodies = page.find_all("tbody")
+    for tbody in tbodies:
+        if isinstance(tbody, Tag):
+            result.append(tbody)
+    return result
 
 def findAllRows(tbody: Tag) -> list[Tag]:
     result = []
@@ -210,12 +211,13 @@ def findAllSections(base_url: str) -> list[Section]:
     sections = []
     url = base_url + API + CONTENUTI
     html =  getPageHtml(url)
-    table = findContentTable(html)
+    tables = findAllContentTables(html)
 
-    if table == None:
+    if tables == None:
         return sections
-
-    trs = findAllRows(table)
+    trs = []
+    for table in tables:
+        trs = trs + findAllRows(table)
 
     for tr in trs:
         a = tr.find("a")
@@ -233,3 +235,26 @@ def findAllSections(base_url: str) -> list[Section]:
                 url=section_url,
                 base_url=base_url))
     return sections
+
+def findAllATags(tr: Tag) -> list[Tag]:
+    result = []
+    a_tags = tr.find_all("a")
+    for a in a_tags:
+        if isinstance(a, Tag) and isinstance(a.get("href"), str):
+            result.append(a)
+
+    return result
+
+def findTableType(tbody: Tag) -> str:
+    """
+    Return "room" if there are other subsections,
+        "thread" if there are some contents
+    """
+    if tbody.has_attr("class"):
+        if "arielRoomList" in tbody["class"]:
+            return "room"
+
+        if "arielThreadList" in tbody["class"]:
+            return "thread"
+
+    return ""

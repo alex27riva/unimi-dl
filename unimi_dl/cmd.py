@@ -20,7 +20,7 @@ from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from getpass import getpass
 from io import TextIOWrapper
-from json import dumps as json_dumps, load as json_load
+from json import dumps as json_dumps
 import logging
 import os
 from unimi_dl.utility.download_manager import DownloadManager
@@ -99,41 +99,6 @@ def log_setup(verbose: bool) -> None:
     logging.basicConfig(level=logging.DEBUG, handlers=[
                         file_handler, stdout_handler])
 
-def download(output_basepath: str, manifest_dict: dict[str, str], downloaded_dict: dict, downloaded_file: TextIOWrapper, simulate: bool, add_to_downloaded_only: bool):
-    main_logger = logging.getLogger(__name__)
-    if not os.access(output_basepath, os.W_OK):
-        main_logger.error(f"can't write to directory {output_basepath}")
-        exit(1)
-    else:
-        ydl_opts = {
-            "v": "true",
-            "nocheckcertificate": "true",
-            "restrictfilenames": "true",
-            "logger": logging.getLogger("youtube-dl")
-        }
-        for filename in manifest_dict:
-            manifest = manifest_dict[filename]
-            if manifest not in downloaded_dict:
-                output_path = os.path.join(output_basepath, filename)
-                ydl_opts["outtmpl"] = output_path + ".%(ext)s"
-                main_logger.info(f"Downloading {filename}")
-                if not simulate:
-                    if not add_to_downloaded_only:
-                        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                            ydl.download([manifest])
-                    downloaded_dict[manifest] = filename
-
-                    downloaded_file.seek(0)
-                    downloaded_file.write(json_dumps(downloaded_dict))
-                    downloaded_file.truncate()
-            else:
-                main_logger.info(
-                    f"Not downloading {filename} since it'd already been downloaded")
-        downloaded_file.close()
-
-    main_logger.info("Downloaded completed")
-
-
 def cleanup_downloaded(downloaded_path: str) -> None:
     main_logger = logging.getLogger(__name__)
     downloaded_dict, downloaded_file = get_downloaded(downloaded_path)
@@ -159,22 +124,6 @@ def cleanup_downloaded(downloaded_path: str) -> None:
         downloaded_file.truncate()
     downloaded_file.close()
     main_logger.info("Cleanup done")
-
-
-def wipe_credentials() -> None:
-    main_logger = logging.getLogger(__name__)
-    if not os.path.isfile(CREDENTIALS):
-        main_logger.warning("Credentials file not found")
-        return
-    main_logger.debug("Prompting user")
-    choice = input(
-        "Are you sure you want to delete stored credentials? [y/N]: ").lower()
-    if choice == "y" or choice == "yes":
-        os.remove(CREDENTIALS)
-        main_logger.info("Credentials file deleted")
-    else:
-        main_logger.info("Credentials file kept")
-
 
 def main():
     opts = get_args()
@@ -230,7 +179,15 @@ def main():
         exit(0)
     elif opts.wipe_credentials:
         main_logger.debug("MODE: WIPE CREDENTIALS")
-        credentials_manager.wipeCredentials()
+        main_logger.debug("Prompting user")
+        choice = input(
+            "Are you sure you want to delete stored credentials? [y/N]: ").lower()
+        if choice == "y" or choice == "yes":
+            credentials_manager.wipeCredentials()
+            main_logger.info("Credentials file deleted")
+        else:
+            main_logger.info("Credentials file kept")
+
         main_logger.debug(
             f"=============job end at {datetime.now()}=============\n")
         exit(0)
