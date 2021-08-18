@@ -5,7 +5,8 @@ from typing import Tuple, Optional
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 
-from urllib.parse import urlparse
+from unimi_dl.platform.course import Section
+import unimi_dl.platform.ariel.ariel_course as ariel_course
 
 from ..session_manager.unimi import UnimiSessionManager
 from ..downloadable import Attachment
@@ -13,56 +14,6 @@ from ..downloadable import Attachment
 API = "/v5/frm3/" #API version of ariel
 OFFERTA_FORMATIVA = "https://ariel.unimi.it/Offerta/myof" #offerta formativa
 CONTENUTI = "ThreadList.aspx?name=contenuti" #contents endpoint of a course
-
-class Section:
-    """
-    It's an implementation of a tree
-
-    `self.root` is the root node of Section
-    `self.parent` is the parent node of Section: if it's root then is None
-    `self.name` is an identifier for the node
-    `self.url` is the url associated to the node
-    `self.base_url` is the base url of the node (the part till .it)
-    `self.attachments` is a list of the attachments of the node. At the first call of getAttachments Section will try to retrieve all the attachments of the ArielNode and the children
-    `self.subsections` is a dictionary with the name and the Section associated with it
-    """
-    def __init__(self, name: str, url: str, base_url: str, parent_section = None) -> None:
-
-        self.parent_section = parent_section # type: Optional[Section]
-        self.name = name
-        self.url = urlparse(url).geturl()
-        self.base_url = urlparse(base_url).geturl()
-        self.attachments = [] # type: list[Attachment]
-        self.subsections = {} # type: dict[str, Section]
-
-        self.has_retrieved = False #indicates if it already retrieved the available attachments
-        
-    def _parseToTree(self):
-        """
-        TODO: doesn't parse subsections
-        """
-        html = getPageHtml(self.url)
-        table = findContentTable(html)
-        
-        trs = []
-        if isinstance(table, Tag):
-            trs = findAllRows(table)
-
-        for tr in trs:
-            self.attachments = findAllAttachments(tr, self.base_url) + self.attachments
-
-    def getAttachments(self) -> list[Attachment]:
-        if not self.has_retrieved:
-            self._parseToTree()
-            for child in self.subsections.values():
-                self.attachments = child.getAttachments() + self.attachments
-
-        return self.attachments.copy()
-
-    def addChild(self, name: str, url: str):
-        self.subsections[name] = (Section(
-            name=name, url=url, base_url=self.base_url, parent_section=self))
-        return True
 
 def findContentTable(html: str) -> Optional[Tag]:
     page = BeautifulSoup(html, "html.parser")
@@ -252,11 +203,11 @@ def findCourseEdition(div: Tag):
 
     return edition
 
-def findAllSections(base_url: str) -> dict[str, Section]:
+def findAllSections(base_url: str) -> list[Section]:
     """
     Finds all the sections of a given course specified in `base_url`
     """
-    sections = {}
+    sections = []
     url = base_url + API + CONTENUTI
     html =  getPageHtml(url)
     table = findContentTable(html)
@@ -277,8 +228,8 @@ def findAllSections(base_url: str) -> dict[str, Section]:
             section_url = base_url + API + href
             name = a.get_text()
 
-            sections[name] = Section(
+            sections.append(ariel_course.ArielSection(
                 name=name,
                 url=section_url,
-                base_url=base_url)
+                base_url=base_url))
     return sections

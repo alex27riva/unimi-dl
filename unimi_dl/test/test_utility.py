@@ -35,11 +35,11 @@ class TestUtility(unittest.TestCase):
         download_manager = DownloadManager("./test/downloaded.json")
 
         ariel = self.ariel
-        courses = ariel.get_courses()
+        courses = ariel.getCourses()
         course = courses[0]
         video = None
         document = None
-        for section_name in course.getSections():
+        for section in course.getSections():
             if video is not None and document is not None:
                 download_manager.doDownload("ariel", document, str(self.path_test))
                 assert(Path(str(self.path_test), document.name).exists())
@@ -53,7 +53,7 @@ class TestUtility(unittest.TestCase):
                 assert(document.url in downloaded_json["ariel"])
                 break
 
-            attachments = course.getSectionAttachments(section_name)
+            attachments = section.getAttachments()
             for attachment in attachments:
                 
                 if video is not None and document is not None:

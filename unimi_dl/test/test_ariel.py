@@ -1,3 +1,4 @@
+from unimi_dl.platform.course import Section
 from unimi_dl.platform.ariel import Course
 import unittest
 from ..platform import Ariel
@@ -28,20 +29,20 @@ class TestAriel(unittest.TestCase):
     def test_getcourses(self):
         ariel = self.instance
 
-        self.courses = ariel.get_courses()
+        self.courses = ariel.getCourses()
         for course in self.courses:
             assert(isinstance(course, Course))
 
     def test_course_getAttachments_and_download(self):
         ariel = self.instance
         
-        courses = ariel.get_courses()
+        courses = ariel.getCourses()
         course = courses[0]
-        for section_name in course.getSections():
-            print(section_name)
-            assert(isinstance(section_name, str))
-            assert(section_name != "")
-            attachments = course.getSectionAttachments(section_name)
+        for section in course.getSections():
+            print(section)
+            assert(isinstance(section, Section))
+            assert(section != "")
+            attachments = section.getAttachments()
             video = None
             document = None
             for attachment in attachments:

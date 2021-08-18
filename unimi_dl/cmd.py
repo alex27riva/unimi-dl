@@ -21,43 +21,24 @@ from datetime import datetime
 from getpass import getpass
 from io import TextIOWrapper
 from json import dumps as json_dumps, load as json_load
-from json.decoder import JSONDecodeError
 import logging
 import os
-from pathlib import Path
+from unimi_dl.utility.download_manager import DownloadManager
+from unimi_dl.utility.credentials_manager import CredentialsManager
+from unimi_dl import LOCAL
 import platform as pt
 import sys
-
+from unimi_dl.platform.ariel import Ariel
 from requests import __version__ as reqv
 import youtube_dl
 from youtube_dl.version import __version__ as ytdv
-
-from . import __version__ as udlv
+from unimi_dl.platform.course import Course, Section
+from unimi_dl.platform.downloadable import Attachment
+from . import CREDENTIALS, DOWNLOADED, LOG, __version__ as udlv
 from .multi_select import WrongSelectionError, multi_select
 from .platform import getPlatform
 
-
-def get_data_dir() -> Path:
-    """ Returns a parent directory path
-    where persistent application data can be stored.
-
-    # linux: ~/.local/share
-    # macOS: ~/Library/Application Support
-    # windows: C:/Users/<USER>/AppData/Roaming """
-
-    home = Path.home()
-
-    if sys.platform == "win32":
-        return home / "AppData/Roaming"
-    elif sys.platform == "linux":
-        return home / ".local/share"
-    elif sys.platform == "darwin":
-        return home / "Library/Application Support"
-    else:
-        raise NotImplementedError
-
-
-def get_args(local: str) -> Namespace:
+def get_args() -> Namespace:
     parser = ArgumentParser(
         description=f"Unimi material downloader v. {udlv}")
     if not set(["--cleanup-downloaded", "--wipe-credentials"]) & set(sys.argv):
@@ -67,12 +48,11 @@ def get_args(local: str) -> Namespace:
                         type=str, default="ariel", choices=["ariel", "panopto"],
                         help="platform to download the video(s) from (default: ariel)")
     parser.add_argument("-s", "--save", action="store_true",
-                        help=f"saves credentials (unencrypted) in {local}/credentials.json")
+                        help=f"saves credentials (unencrypted) in {CREDENTIALS}")
     parser.add_argument("--ask", action="store_true",
                         help=f"asks credentials even if stored")
     parser.add_argument("-c", "--credentials", metavar="PATH",
-                        type=str, default=os.path.join(
-                            local, "credentials.json"),
+                        type=str, default=CREDENTIALS,
                         help="path of the credentials json to be used for logging into the platform")
     parser.add_argument("-o", "--output", metavar="PATH",
                         type=str, default=os.getcwd(), help="directory to download the video(s) into")
@@ -85,7 +65,7 @@ def get_args(local: str) -> Namespace:
     modes.add_argument("--simulate", action="store_true",
                        help=f"retrieve video names and manifests, but don't download anything nor update the downloaded list")
     modes.add_argument("--add-to-downloaded-only",
-                       action="store_true", help="retrieve video names and manifests, but don't download anything, only update the downloaded list")
+                       action="store_true",help="retrieve video names and manifests and only update the downloaded list (no download)")
     modes.add_argument("--cleanup-downloaded", action="store_true",
                        help="interactively select what videos to clean from the downloaded list")
     modes.add_argument("--wipe-credentials",
@@ -95,7 +75,7 @@ def get_args(local: str) -> Namespace:
     return opts
 
 
-def log_setup(verbose: bool, local: str) -> None:
+def log_setup(verbose: bool) -> None:
     # silencing spammy logger
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -111,64 +91,13 @@ def log_setup(verbose: bool, local: str) -> None:
             logging.Formatter("%(levelname)s: %(message)s"))
 
     # setting up file handler
-    file_handler = logging.FileHandler(os.path.join(local, "log.txt"))
+    file_handler = logging.FileHandler(LOG)
     file_handler.setFormatter(logging.Formatter(
         "%(levelname)s[%(name)s]: %(message)s"))
 
     # finalizing
     logging.basicConfig(level=logging.DEBUG, handlers=[
                         file_handler, stdout_handler])
-
-
-def get_credentials(credentials_path: str, ask: bool, save: bool) -> tuple[str, str]:
-    email = None
-    password = None
-    creds = {}
-    if os.path.isfile(credentials_path):
-        with open(credentials_path, "r") as credentials_file:
-            try:
-                creds = json_load(credentials_file)
-            except JSONDecodeError:
-                main_logger.warning("Error parsing credentials json")
-            try:
-                email = creds["email"]
-                password = creds["password"]
-            except KeyError:
-                pass
-
-    if email == None or password == None or ask:
-        main_logger.info(f"Asking credentials")
-        print(f"Insert credentials")
-        email = input(f"username/email: ")
-        password = getpass(f"password (input won't be shown): ")
-        if save:
-            creds = {"email": email, "password": password}
-            head, _ = os.path.split(credentials_path)
-            if not os.access(head, os.W_OK):
-                main_logger.warning(f"Can't write to directory {head}")
-            else:
-                with open(credentials_path, "w") as new_credentials:
-                    new_credentials.write(json_dumps(creds))
-                    main_logger.info(
-                        f"Credentials saved succesfully in {credentials_path}")
-    return email, password
-
-
-def get_downloaded(downloaded_path: str) -> tuple[dict[str, dict[str, str]], TextIOWrapper]:
-    main_logger = logging.getLogger(__name__)
-    downloaded_dict = {}
-    if not os.path.isfile(downloaded_path):
-        downloaded_file = open(downloaded_path, "w")
-    else:
-        downloaded_file = open(downloaded_path, "r+")
-        if os.stat(downloaded_path).st_size:
-            try:
-                downloaded_dict = json_load(downloaded_file)
-            except JSONDecodeError:
-                main_logger.warning(
-                    f"Error parsing downloaded json. Consider deleting {downloaded_path}")
-    return downloaded_dict, downloaded_file
-
 
 def download(output_basepath: str, manifest_dict: dict[str, str], downloaded_dict: dict, downloaded_file: TextIOWrapper, simulate: bool, add_to_downloaded_only: bool):
     main_logger = logging.getLogger(__name__)
@@ -232,29 +161,26 @@ def cleanup_downloaded(downloaded_path: str) -> None:
     main_logger.info("Cleanup done")
 
 
-def wipe_credentials(credentials_path: str) -> None:
+def wipe_credentials() -> None:
     main_logger = logging.getLogger(__name__)
-    if not os.path.isfile(credentials_path):
+    if not os.path.isfile(CREDENTIALS):
         main_logger.warning("Credentials file not found")
         return
     main_logger.debug("Prompting user")
     choice = input(
         "Are you sure you want to delete stored credentials? [y/N]: ").lower()
     if choice == "y" or choice == "yes":
-        os.remove(credentials_path)
+        os.remove(CREDENTIALS)
         main_logger.info("Credentials file deleted")
     else:
         main_logger.info("Credentials file kept")
 
 
 def main():
-    local_path = os.path.join(get_data_dir(), "unimi-dl")
-    if not os.path.isdir(local_path):
-        os.makedirs(local_path)
-
-    opts = get_args(local_path)
-    downloaded_path = os.path.join(local_path, "downloaded.json")
-    log_setup(opts.verbose, local_path)
+    opts = get_args()
+    if not os.path.isdir(LOCAL):
+        os.makedirs(LOCAL)
+    log_setup(opts.verbose)
     main_logger = logging.getLogger(__name__)
 
     main_logger.debug(
@@ -264,24 +190,11 @@ def main():
     OS: {pt.platform()}
     Release: {pt.release()}
     Version: {pt.version()}
-    Local: {local_path}
+    Local: {LOCAL}
     Python: {sys.version}
     Requests: {reqv}
     YoutubeDL: {ytdv}
-    Downloaded file: {downloaded_path}""")
-
-    if opts.cleanup_downloaded:
-        main_logger.debug("MODE: DOWNLOADED CLEANUP")
-        cleanup_downloaded(downloaded_path)
-        main_logger.debug(
-            f"=============job end at {datetime.now()}=============\n")
-        exit(0)
-    elif opts.wipe_credentials:
-        main_logger.debug("MODE: WIPE CREDENTIALS")
-        wipe_credentials(opts.credentials)
-        main_logger.debug(
-            f"=============job end at {datetime.now()}=============\n")
-        exit(0)
+    Downloaded file: {DOWNLOADED}""")
 
     opts.url = opts.url.replace("\\", "")
     main_logger.debug(f"""MODE: {"SIMULATE" if opts.simulate else "ADD TO DOWNLOADED ONLY" if opts.add_to_downloaded_only else "DOWNLOAD"}
@@ -294,33 +207,90 @@ def main():
     Credentials: {opts.credentials}
     Output: {opts.output}""")
 
-    email, password = get_credentials(opts.credentials, opts.ask, opts.save)
+    # get credentials
+    credentials_manager = CredentialsManager(opts.credentials)
+    credentials = credentials_manager.getCredentials()
+    email = credentials.email
+    password = credentials.password
+    if opts.ask or email is None or password is None:
+        main_logger.info(f"Asking credentials")
+        print(f"Insert credentials")
+        email = input(f"username/email: ")
+        password = getpass(f"password (input won't be shown): ")
+        if opts.save:
+            credentials_manager.setCredentials(email, password)
 
-    all_manifest_dict = getPlatform(
-        email, password, opts.platform).get_manifests(opts.url)
+    download_manager = DownloadManager(DOWNLOADED)
 
-    if len(all_manifest_dict) == 0:
-        main_logger.warning("No videos found")
+    if opts.cleanup_downloaded:
+        main_logger.debug("MODE: DOWNLOADED CLEANUP")
+        cleanup_downloaded(DOWNLOADED)
+        main_logger.debug(
+            f"=============job end at {datetime.now()}=============\n")
+        exit(0)
+    elif opts.wipe_credentials:
+        main_logger.debug("MODE: WIPE CREDENTIALS")
+        credentials_manager.wipeCredentials()
+        main_logger.debug(
+            f"=============job end at {datetime.now()}=============\n")
+        exit(0)
+
+    platform = getPlatform(email, password, opts.platform)
+    if isinstance(platform, Ariel):
+        courses = platform.getCourses()
+        selected_courses = multi_select(courses, courses, "Scegli il corso: ") # type: list[Course]
+
+        for course in selected_courses:
+            entries = course.getSections()
+            selected_sections = multi_select(entries, entries, "Scegli le sezioni: ") # type: list[Section]
+
+            attachments = []
+            for section in selected_sections:
+                attachments = section.getAttachments() + attachments 
+
+            selected_attachments = multi_select(
+                entries=attachments,
+                entries_text=attachments,
+                selection_text="Scegli i file che vuoi scaricare ") # type: list[Attachment]
+
+            for attachment in selected_attachments:
+                if not opts.simulate:
+                    download_manager.doDownload(
+                        attachment=attachment,
+                        dry_run=opts.add_to_downloaded_only,
+                        path=opts.output,
+                        platform=opts.platform
+                    )
     else:
-        if opts.all or opts.platform == "panopto":
-            manifest_dict = all_manifest_dict
-        else:
-            try:
-                selection = multi_select(
-                    list(all_manifest_dict.keys()), selection_text="\nVideos to download: ")
-            except WrongSelectionError:
-                main_logger.error("Your selection is not valid")
-                exit(1)
-            manifest_dict = {
-                name: all_manifest_dict[name] for name in selection}
+        pass
 
-        if len(manifest_dict) != 0:
-            main_logger.info(f"Videos: {list(manifest_dict.keys())}")
+    download_manager.save()
 
-            downloaded_dict, downloaded_file = get_downloaded(downloaded_path)
+#    all_manifest_dict = getPlatform(
+#        email, password, opts.platform).get_manifests(opts.url)
+#
+#    if len(all_manifest_dict) == 0:
+#        main_logger.warning("No videos found")
+#    else:
+#        if opts.all or opts.platform == "panopto":
+#            manifest_dict = all_manifest_dict
+#        else:
+#            try:
+#                selection = multi_select(
+#                    list(all_manifest_dict.keys()), selection_text="\nVideos to download: ")
+#            except WrongSelectionError:
+#                main_logger.error("Your selection is not valid")
+#                exit(1)
+#            manifest_dict = {
+#                name: all_manifest_dict[name] for name in selection}
 
-            download(opts.output, manifest_dict, downloaded_dict,
-                     downloaded_file, opts.simulate, opts.add_to_downloaded_only)
-            downloaded_file.close()
+#        if len(manifest_dict) > 0:
+#            main_logger.info(f"Videos: {list(manifest_dict.keys())}")
+#
+#            downloaded_dict, downloaded_file = get_downloaded()
+#
+#            download(opts.output, manifest_dict, downloaded_dict,
+#                     downloaded_file, opts.simulate, opts.add_to_downloaded_only)
+#            downloaded_file.close()
     main_logger.debug(
         f"=============job end at {datetime.now()}=============\n")

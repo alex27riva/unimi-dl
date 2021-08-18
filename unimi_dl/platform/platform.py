@@ -17,12 +17,27 @@
 
 
 from __future__ import annotations
+from unimi_dl.platform.downloadable import Attachment
+from unimi_dl.platform.course import Course
 
 
 class Platform:
     def __init__(self, email: str, password: str) -> None:
         self.email = email
         self.password = password
+
+    def getCourses(self) -> list[Course]:
+        """
+        Returns a list of available Courses on the `Platform`
+        """
+        raise NotImplementedError
+
+    def getAttachments(self, url: str) -> list[Attachment]:
+        """
+        Returns a list of `Attachment` available for download from `url`.
+        Replaces the deprecated `get_manifests`
+        """
+        raise NotImplementedError
 
     def get_manifests(self, url: str) -> dict[str, str]:
         """ Returns a list of couples, each one containing a filename and relative

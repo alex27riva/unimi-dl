@@ -21,8 +21,9 @@ import logging
 import re
 import urllib.parse
 
-from .utils import findAllCourses
-from .course import Course
+import unimi_dl.platform.ariel.utils as utils
+import unimi_dl.platform.ariel.ariel_course as ariel_course
+from unimi_dl.platform.course import Course
 
 from ..session_manager.unimi import UnimiSessionManager
 
@@ -38,15 +39,15 @@ class Ariel(Platform):
         self.logger = logging.getLogger(__name__)
         self.logger.info("Logging in")
 
-    def get_courses(self) -> list[Course]:
+    def getCourses(self) -> list[Course]:
         """Returns a list of `Course` of the accessible courses"""
         if not self.courses:
             self.courses = []
-            for course in findAllCourses():
+            for course in utils.findAllCourses():
                 name, teachers, url, edition = course
-                self.courses.append(Course(name=name, teachers=teachers, url=url, edition=edition))
+                self.courses.append(ariel_course.ArielCourse(name=name, teachers=teachers, url=url, edition=edition))
 
-        return self.courses.copy()
+        return self.courses.copy() #it's a shallow copy, need a deep copy maybe?
 
     #
     # TODO: remove this
