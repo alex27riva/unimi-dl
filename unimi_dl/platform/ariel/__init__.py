@@ -19,6 +19,7 @@
 from __future__ import annotations, with_statement
 import logging
 import re
+from unimi_dl.platform.downloadable import Attachment
 import urllib.parse
 
 import unimi_dl.platform.ariel.utils as utils
@@ -49,6 +50,8 @@ class Ariel(Platform):
 
         return self.courses.copy() #it's a shallow copy, need a deep copy maybe?
 
+    def getAttachments(self, url: str) -> list[Attachment]:
+        return super().getAttachments(url)
     #
     # TODO: remove this
     def get_manifests(self, url: str) -> dict[str, str]:

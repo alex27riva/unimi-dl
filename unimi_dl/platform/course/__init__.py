@@ -5,7 +5,6 @@ from typing import Optional
 from unimi_dl.platform.downloadable import Attachment
 
 class Section:
-
     def __init__(self, name: str, url: str, base_url: str, parent_section = None) -> None:
         self.parent_section = parent_section # type: Optional[Section]
         self.name = name

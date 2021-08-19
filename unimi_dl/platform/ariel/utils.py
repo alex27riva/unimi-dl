@@ -1,6 +1,6 @@
 import re
 
-from typing import Tuple, Optional
+from typing import Tuple
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
