@@ -1,8 +1,11 @@
+import logging
+
 from urllib.parse import urlparse
 
 from .utils import download_by_requests
 from .utils import download_by_ydl
 
+logger = logging.getLogger(__name__)
 class Attachment:
     def __init__(self, name: str, filetype: str, url: str, section_name: str, description: str="") -> None:
         self.section_name = section_name
@@ -20,7 +23,7 @@ class Attachment:
     def download(self, path_prefix: str) -> bool:
         import os
         path = os.path.join(path_prefix, self.name)
-        print(f"Downloading '{path}'")
+        logger.info(f"Downloading '{path}'")
         return self._download(self.url, path)
 
     def __repr__(self) -> str:
