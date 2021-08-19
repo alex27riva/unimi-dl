@@ -24,16 +24,15 @@ import logging
 import os
 from unimi_dl.utility.download_manager import DownloadManager
 from unimi_dl.utility.credentials_manager import CredentialsManager
-from unimi_dl import LOCAL
+from unimi_dl import LOCAL, CREDENTIALS, DOWNLOADED, LOG
 import platform as pt
 import sys
 from unimi_dl.platform.ariel import Ariel
 from requests import __version__ as reqv
-import youtube_dl
 from youtube_dl.version import __version__ as ytdv
 from unimi_dl.platform.course import Course, Section
 from unimi_dl.platform.downloadable import Attachment
-from . import CREDENTIALS, DOWNLOADED, LOG, __version__ as udlv
+from . import  __version__ as udlv
 from .multi_select import WrongSelectionError, multi_select
 from .platform import getPlatform
 
@@ -199,30 +198,8 @@ def main():
         for course in selected_courses:
             entries = course.getSections()
             selected_sections = multi_select(entries, entries, "Scegli le sezioni: ") # type: list[Section]
-
-            choices = []
             for section in selected_sections:
-                cur_section = section
-                while len(cur_section.getSubsections()) > 0:
-                    choices = cur_section.getAttachments() + cur_section.getSubsections() # type: ignore
-                    print(choices)
-                    selected_choices = multi_select(
-                        entries=choices,
-                        entries_text=choices,
-                        selection_text="Scegli un file o una sezione ")
-
-                    for choice in selected_choices:
-                        if isinstance(choice, Attachment):
-                            if not opts.simulate:
-                                download_manager.doDownload(
-                                    attachment=choice,
-                                    dry_run=opts.add_to_downloaded_only,
-                                    path=opts.output,
-                                    platform=opts.platform
-                                )
-
-                        if isinstance(choice, Section):
-                            cur_section = choice
+                show(section, opts.simulate, opts.add_to_downloaded_only, opts.platform, opts.output, download_manager)
     else:
         pass
 
@@ -256,3 +233,25 @@ def main():
 #            downloaded_file.close()
     main_logger.debug(
         f"=============job end at {datetime.now()}=============\n")
+
+def show(section: Section, simulate: bool, add_to_downloaded_only: bool,
+    platform: str, output: str, download_manager: DownloadManager):
+    sections = section.getSubsections()
+    choices = sections + section.getAttachments() # type: ignore
+    selected_choices = multi_select(
+        entries=choices,
+        entries_text=choices,
+        selection_text="Scegli un file o una sezione ")
+
+    for choice in selected_choices:
+        if isinstance(choice, Section):
+            show(choice, simulate, add_to_downloaded_only, platform, output, download_manager)
+
+        if isinstance(choice, Attachment):
+            if not simulate:
+                download_manager.doDownload(
+                    attachment=choice,
+                    dry_run=add_to_downloaded_only,
+                    path=output,
+                    platform=platform
+)
