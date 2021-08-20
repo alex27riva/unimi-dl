@@ -55,12 +55,12 @@ class DownloadManager:
         """
         Downloads the `attachment` in the given `path` and saves it under `platform`.
         If `dry_run` is True then the `attachment` is only added to the downloaded list but not effectively downloaded
+        If `force` is True then the `attachment` will be downloaded even if it's already in the downloaded list (by default is False)
         TODO: 
         - to change, need a better way to handle type hinting
-        - check if it's already downloaded
         """
         l = getattr(self.downloaded, platform) # type: list[str]
-        if attachment.url not in l or force:
+        if attachment.url not in l or force: # check if it's already downloaded
             if dry_run or attachment.download(path):
                 l.append(attachment.url)
                 setattr(self.downloaded, platform, l)

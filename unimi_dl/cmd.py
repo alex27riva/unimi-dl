@@ -171,6 +171,9 @@ def main():
 
     if opts.cleanup_downloaded:
         main_logger.debug("MODE: DOWNLOADED CLEANUP")
+        chosen = multi_select(choices, entries_text=entt,
+                              selection_text="\nVideos to remove from the downloaded list: ")
+
         cleanup_downloaded(DOWNLOADED)
         main_logger.debug(
             f"=============job end at {datetime.now()}=============\n")
