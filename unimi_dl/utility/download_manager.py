@@ -39,7 +39,8 @@ class DownloadManager:
             with(self.path.open("r") as downloaded_file):
                 try:
                     downloaded_json = json_load(downloaded_file) # type: dict[str, list[str]]
-                    ariel = downloaded_json.get("ariel") # avoid KeyError
+                    # avoid KeyError
+                    ariel = downloaded_json.get("ariel")
                     panopto = downloaded_json.get("panopto")
                     msstream = downloaded_json.get("msstream")
                     self.downloaded = Downloads(ariel, panopto, msstream)
@@ -54,7 +55,9 @@ class DownloadManager:
         """
         Downloads the `attachment` in the given `path` and saves it under `platform`.
         If `dry_run` is True then the `attachment` is only added to the downloaded list but not effectively downloaded
-        TODO: to change, need a better way to handle type hinting
+        TODO: 
+        - to change, need a better way to handle type hinting
+        - check if it's already downloaded
         """
         l = getattr(self.downloaded, platform) # type: list[str]
         if attachment.url not in l or force:

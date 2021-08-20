@@ -25,7 +25,16 @@ class Attachment:
         import os
         path = os.path.join(path_prefix, self.name)
         logger.info(f"Downloading '{path}'")
-        return self._download(self.url, path)
+        result = self._download(self.url, path)
+
+        if result:
+            print(f"Download completed")
+            logger.info(f"Download completed")
+        else:
+            print("Error occurred during download. Please retry")
+            logger.info("Error occurred during download. Please retry")
+
+        return result
 
     def __repr__(self) -> str:
         return "{name}".format(name=self.name)
