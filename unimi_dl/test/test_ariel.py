@@ -39,7 +39,6 @@ class TestAriel(unittest.TestCase):
         courses = ariel.getCourses()
         course = courses[0]
         for section in course.getSections():
-            print(section)
             assert(isinstance(section, Section))
             assert(section != "")
             attachments = section.getAttachments()
