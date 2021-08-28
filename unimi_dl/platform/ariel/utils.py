@@ -54,7 +54,12 @@ def findAllVideos(tr: Tag) -> list[Attachment]:
         url = ""
         if isinstance(video, Tag):
             url = findVideoUrl(video)
-        name = (url.split(":")[2])[0:-14] #extracts the video name from the `manifest.m3u8`
+
+        #extracts the video name from the `manifest.m3u8`
+        name = url.replace("/manifest.m3u8", "")
+        name = name.split("mp4:")[-1]
+        name = name.split("/")[-1]
+
         section_name = ""
         description = findPostDescription(tr)
         attachments.append(Attachment(
