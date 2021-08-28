@@ -22,34 +22,9 @@ class ArielSection(Section):
         if url.startswith("ThreadList.aspx"):
             url = base_url + utils.API + url
         super().__init__(name=name, url=url, base_url=base_url, parent_section=parent_section)
-        self._parseToTree()
-        self.has_retrieved = False #indicates if it already retrieved the available attachments
+        self.has_subsections = False #indicates if it already retrieved the available subsections
+        self.has_attachments = False
         
-    def _parseToTree(self):
-        """
-        Fetches `subsections` and all the `attachments` available in the section
-        """
-        html = utils.getPageHtml(self.url)
-        
-        rooms = utils.findAllArielRoomsList(html) # get subsections
-        
-        for thread in rooms:
-            if isinstance(thread, Tag):
-                trs = utils.findAllRows(thread)
-                for tr in trs:
-                    a_tags = utils.findAllATags(tr)
-                    for a in a_tags:
-                        href = a.get("href")
-                        if isinstance(href, str):
-                            self.addSection(name=a.get_text(), url=href)
-            
-        threads = utils.findAllArielThreadList(html) # get threads
-        for thread in threads:
-            if isinstance(thread, Tag):
-                trs = utils.findAllRows(thread)
-                for tr in trs:
-                    self.attachments = self.attachments + utils.findAllAttachments(tr, self.base_url)
-
     def getAllAttachments(self) -> list[Attachment]:
         attachments = []
         for child in self.subsections:
@@ -57,9 +32,34 @@ class ArielSection(Section):
         return self.getAttachments() + attachments
 
     def getAttachments(self) -> list[Attachment]:
+        if not self.has_attachments:
+            html = utils.getPageHtml(self.url)
+            threads = utils.findAllArielThreadList(html) # get threads
+            for thread in threads:
+                if isinstance(thread, Tag):
+                    trs = utils.findAllRows(thread)
+                    for tr in trs:
+                        self.attachments = self.attachments + utils.findAllAttachments(tr, self.base_url)
+
+            self.has_attachments = True
         return self.attachments.copy()
 
     def getSubsections(self) -> list[Section]:
+        if not self.has_subsections:
+            html = utils.getPageHtml(self.url)
+            rooms = utils.findAllArielRoomsList(html) # get subsections
+
+            for thread in rooms:
+                if isinstance(thread, Tag):
+                    trs = utils.findAllRows(thread)
+                    for tr in trs:
+                        a_tags = utils.findAllATags(tr)
+                        for a in a_tags:
+                            href = a.get("href")
+                            if isinstance(href, str):
+                                self.addSection(name=a.get_text(), url=href)
+
+            self.has_subsections = True
         return self.subsections
 
     def addSection(self, name: str, url: str):

@@ -1,4 +1,5 @@
 import re
+from time import sleep
 
 from typing import Tuple
 
@@ -26,7 +27,7 @@ def findAllContentTables(html: str) -> list[Tag]:
 
 def findAllRows(tbody: Tag) -> list[Tag]:
     result = []
-    trs = tbody.find_all("tr")
+    trs = tbody.find_all("tr", recursive=False)#, class_="sticky")
     for tr in trs:
         if isinstance(tr, Tag):
             result.append(tr)
@@ -34,7 +35,9 @@ def findAllRows(tbody: Tag) -> list[Tag]:
 
 def findAllAttachments(tr: Tag, base_url: str) -> list[Attachment]:
     attachments = []
-    attachments = attachments + findAllVideos(tr) + findAllDocuments(tr, base_url) 
+    videos = findAllVideos(tr)
+    documents = findAllDocuments(tr, base_url)
+    attachments = attachments + videos + documents
     return attachments
 
 def findAllVideos(tr: Tag) -> list[Attachment]:
@@ -81,6 +84,12 @@ def findVideoUrl(video: Tag) -> str:
 def findAllDocuments(tr: Tag, base_url: str) -> list[Attachment]:
     attachments = []
     a_tags = tr.find_all("a", class_=["filename"])
+    if a_tags:
+        pass
+#        print(tr)
+#        input()
+#        print(a_tags)
+#        input()
     for a in a_tags:
         if not isinstance(a, Tag):
             continue
