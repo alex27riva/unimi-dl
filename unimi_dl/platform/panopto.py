@@ -15,18 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with unimi-dl.  If not, see <https://www.gnu.org/licenses/>.
 
-
+from .platform import Platform
+from .session_manager.unimi import UnimiSessionManager
 from __future__ import annotations
-import logging
-import re
-
-import requests
+from unimi_dl.platform.downloadable import Attachment
 from urllib3 import disable_warnings
-import urllib.parse
 from urllib3.exceptions import InsecureRequestWarning
 
-from .session_manager.unimi import UnimiSessionManager
-from .platform import Platform
+
+import logging
+import re
+import requests
+import urllib.parse
 
 
 def get_panopto_session(email: str, password: str) -> requests.Session:
@@ -43,6 +43,16 @@ class Panopto(Platform):
         self.logger = logging.getLogger(__name__)
         self.logger.info("Logging in")
         self.session = get_panopto_session(email, password)
+
+    def getAttachments(self, url: str) -> list[Attachment]:
+        attachments = []
+        videos = self.get_manifests(url)
+        for filename in videos.keys():
+            manifest = videos.get(filename)
+            if isinstance(manifest, str):
+                attachments.append(Attachment(
+                    filename, "video", manifest, "", ""))
+        return attachments
 
     def get_manifests(self, url: str) -> dict[str, str]:
         self.logger.info("Getting video page")
