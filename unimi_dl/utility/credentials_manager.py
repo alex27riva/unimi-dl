@@ -2,7 +2,6 @@ import logging
 
 from pathlib import Path
 from json import dumps as json_dumps, load as json_load
-from json.decoder import JSONDecodeError
 from typing import Optional
 
 main_logger = logging.getLogger(__name__)

@@ -20,6 +20,10 @@ from __future__ import annotations
 from unimi_dl.platform.downloadable import Attachment
 from unimi_dl.platform.course import Course
 
+from .ariel import Ariel
+from .panopto import Panopto
+from .platform import Platform
+
 
 class Platform:
     def __init__(self, email: str, password: str) -> None:
@@ -42,5 +46,14 @@ class Platform:
     def get_manifests(self, url: str) -> dict[str, str]:
         """ Returns a list of couples, each one containing a filename and relative
         manifest, fetched from {url} """
+        raise NotImplementedError
 
+    @staticmethod
+    def getPlatform(email: str, password: str, platform: str) -> Platform:
+        """ Factory method to create the appropriate Platform instance. """
+
+        if platform == 'ariel':
+            return Ariel(email, password)
+        if platform == 'panopto':
+            return Panopto(email, password)
         raise NotImplementedError

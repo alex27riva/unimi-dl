@@ -19,12 +19,11 @@
 __version__ = "0.3.0"
 __license__ = "GPL v.3"
 
-from unimi_dl.platform import getPlatform
-from unimi_dl.platform.platform import Platform #TODO: redundant namespace
 
 from os.path import join
 from pathlib import Path
 import sys
+from unimi_dl import cmd
 
 def get_data_dir() -> Path:
     """ Returns a parent directory path
@@ -51,4 +50,4 @@ DOWNLOADED = join(LOCAL, "downloaded.json")
 LOG = join(LOCAL, "log.txt")
 AVAILABLE_PLATFORMS = ["ariel", "panopto"]
 
-__all__ = ["cmd"]
+__all__ = ["cmd", "LOCAL", "CREDENTIALS", "DOWNLOADED", "LOG", "AVAILABLE_PLATFORMS"]

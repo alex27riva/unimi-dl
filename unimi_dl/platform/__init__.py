@@ -16,8 +16,8 @@
 # along with unimi-dl.  If not, see <https://www.gnu.org/licenses/>.
 
 
-from .getPlatform import getPlatform
 from .ariel import Ariel
 from .panopto import Panopto
+from .platform import Platform
 
-__all__ = ["ariel", "getPlatform", "panopto", "platform"]
+__all__ = ["Ariel", "Panopto", "Platform"]

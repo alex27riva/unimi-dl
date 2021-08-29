@@ -16,26 +16,25 @@
 # along with unimi-dl.  If not, see <https://www.gnu.org/licenses/>.
 
 
+from . import __version__ as udlv
+from .multi_select import multi_select
+from .platform import getPlatform
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from getpass import getpass
-from json import dumps as json_dumps
-import logging
-import os
-from typing import List
-from unimi_dl.utility.download_manager import DownloadManager
-from unimi_dl.utility.credentials_manager import CredentialsManager
-from unimi_dl import LOCAL, CREDENTIALS, DOWNLOADED, LOG, AVAILABLE_PLATFORMS
-import platform as pt
-import sys
-from unimi_dl.platform.ariel import Ariel
 from requests import __version__ as reqv
-from youtube_dl.version import __version__ as ytdv
+from typing import List
+from unimi_dl import LOCAL, CREDENTIALS, DOWNLOADED, LOG, AVAILABLE_PLATFORMS
+from unimi_dl.platform import *
 from unimi_dl.platform.course import Course, Section
 from unimi_dl.platform.downloadable import Attachment
-from . import  __version__ as udlv
-from .multi_select import WrongSelectionError, multi_select
-from .platform import getPlatform
+from unimi_dl.utility.credentials_manager import CredentialsManager
+from unimi_dl.utility.download_manager import DownloadManager
+from youtube_dl.version import __version__ as ytdv
+import logging
+import os
+import platform as pt
+import sys
 
 def get_args() -> Namespace:
     parser = ArgumentParser(
@@ -63,7 +62,7 @@ def get_args() -> Namespace:
     modes.add_argument("--simulate", action="store_true",
                        help="retrieve video names and manifests, but don't download anything nor update the downloaded list")
     modes.add_argument("--add-to-downloaded-only",
-                       action="store_true",help="retrieve video names and manifests and only update the downloaded list (no download)")
+                       action="store_true", help="retrieve video names and manifests and only update the downloaded list (no download)")
     modes.add_argument("--cleanup-downloaded", action="store_true",
                        help="interactively select what videos to clean from the downloaded list")
     modes.add_argument("--wipe-credentials",
@@ -97,6 +96,7 @@ def log_setup(verbose: bool) -> None:
     logging.basicConfig(level=logging.DEBUG, handlers=[
                         file_handler, stdout_handler])
 
+
 def main():
     opts = get_args()
     if not os.path.isdir(LOCAL):
@@ -127,7 +127,7 @@ def main():
     Output: {opts.output}""")
 
     if opts.url is not None:
-        opts.url = opts.url.replace("\\", "") #sanitize url
+        opts.url = opts.url.replace("\\", "")  # sanitize url
 
     platforms = opts.platform
     if platforms == "all":
@@ -156,7 +156,7 @@ def main():
         for platform in platforms:
             downloaded = download_manager.getDownloadFrom(platform)
             to_delete = multi_select(downloaded, entries_text=downloaded,
-                                  selection_text=f"\nVideos to remove from the '{platform}' downloaded list: ")
+                                     selection_text=f"\nVideos to remove from the '{platform}' downloaded list: ")
             download_manager.wipeDownloaded(platform, to_delete)
         main_logger.debug(
             f"=============job end at {datetime.now()}=============\n")
@@ -180,19 +180,21 @@ def main():
         p = getPlatform(email, password, opts.platform)
         if isinstance(p, Ariel):
             courses = p.getCourses()
-            selected_courses = multi_select(courses, courses, "Scegli il corso: ") # type: list[Course]
+            selected_courses = multi_select(
+                courses, courses, "Scegli il corso: ")  # type: list[Course]
 
             for course in selected_courses:
                 entries = course.getSections()
-                selected_sections = multi_select(entries, entries, "Scegli le sezioni: ") # type: list[Section]
+                selected_sections = multi_select(
+                    entries, entries, "Scegli le sezioni: ")  # type: list[Section]
                 for section in selected_sections:
                     show(opts.simulate, opts.add_to_downloaded_only,
-                        platform, opts.output, download_manager, section)
+                         platform, opts.output, download_manager, section)
         elif platform == "panopto" and opts.url is not None:
             attachments = p.getAttachments(opts.url)
             show(opts.simulate, opts.add_to_downloaded_only,
-                platform, opts.output, download_manager,
-                additional_attachments=attachments)
+                 platform, opts.output, download_manager,
+                 additional_attachments=attachments)
 
         else:
             print("not supported platform")
@@ -203,13 +205,14 @@ def main():
     main_logger.debug(
         f"=============job end at {datetime.now()}=============\n")
 
+
 def show(simulate: bool, add_to_downloaded_only: bool,
-    platform: str, output: str, download_manager: DownloadManager,
-    section: Section = None, additional_attachments: list[Attachment] = []):
+         platform: str, output: str, download_manager: DownloadManager,
+         section: Section = None, additional_attachments: list[Attachment] = []):
     sections = []
     if section is not None:
         sections = section.getSubsections()
-    choices = sections + section.getAttachments() + additional_attachments # type: ignore
+    choices = sections + section.getAttachments() + additional_attachments  # type: ignore
     selected_choices = multi_select(
         entries=choices,
         entries_text=choices,
@@ -218,7 +221,7 @@ def show(simulate: bool, add_to_downloaded_only: bool,
     for choice in selected_choices:
         if isinstance(choice, Section):
             show(simulate, add_to_downloaded_only, platform, output,
-                download_manager, choice)
+                 download_manager, choice)
 
         if isinstance(choice, Attachment):
             if not simulate:
@@ -227,4 +230,4 @@ def show(simulate: bool, add_to_downloaded_only: bool,
                     dry_run=add_to_downloaded_only,
                     path=output,
                     platform=platform
-)
+                )
