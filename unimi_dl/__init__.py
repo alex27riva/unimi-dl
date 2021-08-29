@@ -49,16 +49,6 @@ LOCAL = join(get_data_dir(), "unimi-dl")
 CREDENTIALS = join(LOCAL, "credentials.json")
 DOWNLOADED = join(LOCAL, "downloaded.json")
 LOG = join(LOCAL, "log.txt")
+AVAILABLE_PLATFORMS = ["ariel", "panopto"]
 
-class UnimiDl:
-    """
-    Provides a uniformed interface to access Unimi's platform (Ariel, Panopto)
-    """
-    def __init__(self, email: str, password: str) -> None:
-        self.email = email
-        self.password = password
-
-    def getPlatform(self, platform: str) -> Platform:
-        return getPlatform(self.email, self.password, platform=platform)
-         
 __all__ = ["cmd"]

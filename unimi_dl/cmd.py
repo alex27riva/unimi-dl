@@ -22,9 +22,10 @@ from getpass import getpass
 from json import dumps as json_dumps
 import logging
 import os
+from typing import List
 from unimi_dl.utility.download_manager import DownloadManager
 from unimi_dl.utility.credentials_manager import CredentialsManager
-from unimi_dl import LOCAL, CREDENTIALS, DOWNLOADED, LOG
+from unimi_dl import LOCAL, CREDENTIALS, DOWNLOADED, LOG, AVAILABLE_PLATFORMS
 import platform as pt
 import sys
 from unimi_dl.platform.ariel import Ariel
@@ -40,11 +41,11 @@ def get_args() -> Namespace:
     parser = ArgumentParser(
         description=f"Unimi material downloader v. {udlv}")
     if not set(["--cleanup-downloaded", "--wipe-credentials"]) & set(sys.argv):
-        parser.add_argument("url", metavar="URL", type=str,
+        parser.add_argument("-u", "--url", metavar="URL", type=str,
                             help="URL of the video(s) to download")
     parser.add_argument("-p", "--platform", metavar="platform",
-                        type=str, default="ariel", choices=["ariel", "panopto"],
-                        help="platform to download the video(s) from (default: ariel)")
+                        type=str, default="all", choices=AVAILABLE_PLATFORMS,
+                        help="platform to download the video(s) from (default: all)")
     parser.add_argument("-s", "--save", action="store_true",
                         help=f"saves credentials (unencrypted) in {CREDENTIALS}")
     parser.add_argument("--ask", action="store_true",
@@ -61,7 +62,7 @@ def get_args() -> Namespace:
                         version=f"%(prog)s {udlv}")
     modes = parser.add_argument_group("other modes")
     modes.add_argument("--simulate", action="store_true",
-                       help=f"retrieve video names and manifests, but don't download anything nor update the downloaded list")
+                       help="retrieve video names and manifests, but don't download anything nor update the downloaded list")
     modes.add_argument("--add-to-downloaded-only",
                        action="store_true",help="retrieve video names and manifests and only update the downloaded list (no download)")
     modes.add_argument("--cleanup-downloaded", action="store_true",
@@ -143,7 +144,6 @@ def main():
     YoutubeDL: {ytdv}
     Downloaded file: {DOWNLOADED}""")
 
-    opts.url = opts.url.replace("\\", "")
     main_logger.debug(f"""MODE: {"SIMULATE" if opts.simulate else "ADD TO DOWNLOADED ONLY" if opts.add_to_downloaded_only else "DOWNLOAD"}
     Request info:
     URL: {opts.url}
@@ -153,6 +153,16 @@ def main():
     All: {opts.all}
     Credentials: {opts.credentials}
     Output: {opts.output}""")
+
+    if opts.url is not None:
+        opts.url = opts.url.replace("\\", "") #sanitize url
+
+    platform = opts.platform
+    if platform == "all":
+        platform = AVAILABLE_PLATFORMS
+
+    if not isinstance(platform, List):
+        platform = [platform]
 
     # get credentials
     credentials_manager = CredentialsManager(opts.credentials)
@@ -173,7 +183,7 @@ def main():
         main_logger.debug("MODE: DOWNLOADED CLEANUP")
         chosen = multi_select(choices, entries_text=entt,
                               selection_text="\nVideos to remove from the downloaded list: ")
-
+        download_manager.wipeDownloaded()
         cleanup_downloaded(DOWNLOADED)
         main_logger.debug(
             f"=============job end at {datetime.now()}=============\n")
