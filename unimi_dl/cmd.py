@@ -23,7 +23,6 @@ from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from getpass import getpass
 from requests import __version__ as reqv
-from typing import List
 from unimi_dl.platform import *
 from unimi_dl.course import *
 from unimi_dl.downloadable import *
@@ -41,7 +40,7 @@ def get_args() -> Namespace:
     parser.add_argument("-u", "--url", metavar="url", type=str,
                         help="URL of the video(s) to download")
     parser.add_argument("-p", "--platform", metavar="platform",
-                        type=str, default="all", choices=unimi_dl.AVAILABLE_PLATFORMS,
+                        type=str, default="ariel", choices=unimi_dl.AVAILABLE_PLATFORMS,
                         help="platform to download the video(s) from (default: all)")
     parser.add_argument("-s", "--save", action="store_true",
                         help=f"saves credentials (unencrypted) in {unimi_dl.CREDENTIALS}")
@@ -128,12 +127,7 @@ def main():
     if opts.url is not None:
         opts.url = opts.url.replace("\\", "")  # sanitize url
 
-    platforms = opts.platform
-    if platforms == "all":
-        platforms = unimi_dl.AVAILABLE_PLATFORMS
-
-    if not isinstance(platforms, List):
-        platforms = [platforms]
+    platform = opts.platform # type: str
 
     # get credentials
     credentials_manager = CredentialsManager(opts.credentials)
@@ -152,7 +146,7 @@ def main():
 
     if opts.cleanup_downloaded:
         main_logger.debug("MODE: DOWNLOADED CLEANUP")
-        for platform in platforms:
+        for platform in platform:
             downloaded = download_manager.getDownloadFrom(platform)
             to_delete = multi_select(downloaded, entries_text=downloaded,
                                      selection_text=f"\nVideos to remove from the '{platform}' downloaded list: ")
@@ -175,29 +169,28 @@ def main():
             f"=============job end at {datetime.now()}=============\n")
         exit(0)
 
-    for platform in platforms:
-        p = getPlatform(email, password, platform)
-        if isinstance(p, Ariel):
-            courses = p.getCourses()
-            selected_courses = multi_select(
-                courses, courses, "Scegli il corso: ")  # type: list[Course]
+    p = getPlatform(email, password, platform)
+    if isinstance(p, Ariel):
+        courses = p.getCourses()
+        selected_courses = multi_select(
+            courses, courses, "Scegli il corso: ")  # type: list[Course]
 
-            for course in selected_courses:
-                entries = course.getSections()
-                selected_sections = multi_select(
-                    entries, entries, "Scegli le sezioni: ")  # type: list[Section]
-                for section in selected_sections:
-                    show(opts.simulate, opts.add_to_downloaded_only,
-                         platform, opts.output, download_manager, section)
-        elif platform == "panopto" and opts.url is not None:
-            attachments = p.getAttachments(opts.url)
-            show(opts.simulate, opts.add_to_downloaded_only,
-                 platform, opts.output, download_manager,
-                 additional_attachments=attachments)
+        for course in selected_courses:
+            entries = course.getSections()
+            selected_sections = multi_select(
+                entries, entries, "Scegli le sezioni: ")  # type: list[Section]
+            for section in selected_sections:
+                show(opts.simulate, opts.add_to_downloaded_only,
+                     platform, opts.output, download_manager, section)
+    elif platform == "panopto" and opts.url is not None:
+        attachments = p.getAttachments(opts.url)
+        show(opts.simulate, opts.add_to_downloaded_only,
+             platform, opts.output, download_manager,
+             additional_attachments=attachments)
 
-        else:
-            print("not supported platform")
-            exit(1)
+    else:
+        print("not supported platform")
+        exit(1)
 
     download_manager.save()
 
