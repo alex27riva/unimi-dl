@@ -16,18 +16,17 @@
 # along with unimi-dl.  If not, see <https://www.gnu.org/licenses/>.
 
 
+import unimi_dl
 from . import __version__ as udlv
 from .multi_select import multi_select
-from .platform import getPlatform
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from getpass import getpass
 from requests import __version__ as reqv
 from typing import List
-from unimi_dl import LOCAL, CREDENTIALS, DOWNLOADED, LOG, AVAILABLE_PLATFORMS
 from unimi_dl.platform import *
-from unimi_dl.platform.course import Course, Section
-from unimi_dl.platform.downloadable import Attachment
+from unimi_dl.course import *
+from unimi_dl.downloadable import *
 from unimi_dl.utility.credentials_manager import CredentialsManager
 from unimi_dl.utility.download_manager import DownloadManager
 from youtube_dl.version import __version__ as ytdv
@@ -42,14 +41,14 @@ def get_args() -> Namespace:
     parser.add_argument("-u", "--url", metavar="url", type=str,
                         help="URL of the video(s) to download")
     parser.add_argument("-p", "--platform", metavar="platform",
-                        type=str, default="all", choices=AVAILABLE_PLATFORMS,
+                        type=str, default="all", choices=unimi_dl.AVAILABLE_PLATFORMS,
                         help="platform to download the video(s) from (default: all)")
     parser.add_argument("-s", "--save", action="store_true",
-                        help=f"saves credentials (unencrypted) in {CREDENTIALS}")
+                        help=f"saves credentials (unencrypted) in {unimi_dl.CREDENTIALS}")
     parser.add_argument("--ask", action="store_true",
                         help=f"asks credentials even if stored")
     parser.add_argument("-c", "--credentials", metavar="PATH",
-                        type=str, default=CREDENTIALS,
+                        type=str, default=unimi_dl.CREDENTIALS,
                         help="path of the credentials json to be used for logging into the platform")
     parser.add_argument("-o", "--output", metavar="PATH",
                         type=str, default=os.getcwd(), help="directory to download the video(s) into")
@@ -88,7 +87,7 @@ def log_setup(verbose: bool) -> None:
             logging.Formatter("%(levelname)s: %(message)s"))
 
     # setting up file handler
-    file_handler = logging.FileHandler(LOG)
+    file_handler = logging.FileHandler(unimi_dl.LOG)
     file_handler.setFormatter(logging.Formatter(
         "%(levelname)s[%(name)s]: %(message)s"))
 
@@ -99,8 +98,8 @@ def log_setup(verbose: bool) -> None:
 
 def main():
     opts = get_args()
-    if not os.path.isdir(LOCAL):
-        os.makedirs(LOCAL)
+    if not os.path.isdir(unimi_dl.LOCAL):
+        os.makedirs(unimi_dl.LOCAL)
     log_setup(opts.verbose)
     main_logger = logging.getLogger(__name__)
 
@@ -111,11 +110,11 @@ def main():
     OS: {pt.platform()}
     Release: {pt.release()}
     Version: {pt.version()}
-    Local: {LOCAL}
+    Local: {unimi_dl.LOCAL}
     Python: {sys.version}
     Requests: {reqv}
     YoutubeDL: {ytdv}
-    Downloaded file: {DOWNLOADED}""")
+    Downloaded file: {unimi_dl.DOWNLOADED}""")
 
     main_logger.debug(f"""MODE: {"SIMULATE" if opts.simulate else "ADD TO DOWNLOADED ONLY" if opts.add_to_downloaded_only else "DOWNLOAD"}
     Request info:
@@ -131,7 +130,7 @@ def main():
 
     platforms = opts.platform
     if platforms == "all":
-        platforms = AVAILABLE_PLATFORMS
+        platforms = unimi_dl.AVAILABLE_PLATFORMS
 
     if not isinstance(platforms, List):
         platforms = [platforms]
@@ -149,7 +148,7 @@ def main():
         if opts.save:
             credentials_manager.setCredentials(email, password)
 
-    download_manager = DownloadManager(DOWNLOADED)
+    download_manager = DownloadManager(unimi_dl.DOWNLOADED)
 
     if opts.cleanup_downloaded:
         main_logger.debug("MODE: DOWNLOADED CLEANUP")
@@ -177,7 +176,7 @@ def main():
         exit(0)
 
     for platform in platforms:
-        p = getPlatform(email, password, opts.platform)
+        p = getPlatform(email, password, platform)
         if isinstance(p, Ariel):
             courses = p.getCourses()
             selected_courses = multi_select(

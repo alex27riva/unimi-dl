@@ -1,5 +1,4 @@
-from unimi_dl.platform.course import Section
-from unimi_dl.platform.ariel import Course
+from unimi_dl.course import Section, Course
 import unittest
 from ..platform import Ariel
 import os

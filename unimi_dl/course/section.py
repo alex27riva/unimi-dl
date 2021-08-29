@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 from typing import Optional
-from unimi_dl.platform.downloadable import Attachment
+from unimi_dl.downloadable import Attachment
 
 
 class Section:

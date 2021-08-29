@@ -1,8 +1,7 @@
 from bs4.element import Tag
 
-from unimi_dl.platform.course import Course
-from unimi_dl.platform.course import Section
-from unimi_dl.platform.downloadable import Attachment
+from unimi_dl.course import Course, Section
+from unimi_dl.downloadable import Attachment
 
 import unimi_dl.platform.ariel.utils as utils
 

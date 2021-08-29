@@ -23,7 +23,7 @@ __license__ = "GPL v.3"
 from os.path import join
 from pathlib import Path
 import sys
-from unimi_dl import cmd
+import unimi_dl.cmd as cmd
 
 def get_data_dir() -> Path:
     """ Returns a parent directory path

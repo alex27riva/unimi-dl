@@ -1,5 +1,5 @@
 import logging
-from ..session_manager.unimi import UnimiSessionManager
+from unimi_dl.platform.session_manager.unimi import UnimiSessionManager
 
 def download_by_ydl(url: str, path: str) -> bool:
     import youtube_dl

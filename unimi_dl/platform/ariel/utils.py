@@ -6,11 +6,11 @@ from typing import Tuple
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 
-from unimi_dl.platform.course import Section
+from unimi_dl.course import Section
 import unimi_dl.platform.ariel.ariel_course as ariel_course
 
-from ..session_manager.unimi import UnimiSessionManager
-from ..downloadable import Attachment
+from unimi_dl.platform.session_manager.unimi import UnimiSessionManager
+from unimi_dl.downloadable import Attachment
 
 API = "/v5/frm3/" #API version of ariel
 OFFERTA_FORMATIVA = "https://ariel.unimi.it/Offerta/myof" #offerta formativa

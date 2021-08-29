@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from unimi_dl.platform.downloadable import Attachment
+from unimi_dl.downloadable import Attachment
 
 from json import dumps as json_dumps, load as json_load
 from json.decoder import JSONDecodeError

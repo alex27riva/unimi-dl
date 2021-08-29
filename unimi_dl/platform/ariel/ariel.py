@@ -1,15 +1,14 @@
 import logging
 import re
-from unimi_dl.platform.downloadable import Attachment
+from unimi_dl.downloadable import Attachment
+from unimi_dl.course import Course
 import urllib.parse
 
 import unimi_dl.platform.ariel.utils as utils
 import unimi_dl.platform.ariel.ariel_course as ariel_course
-from unimi_dl.platform.course import Course
-
-from ..session_manager.unimi import UnimiSessionManager
 
 from ..platform import Platform
+from ..session_manager.unimi import UnimiSessionManager
 
 class Ariel(Platform):
     def __init__(self, email: str, password: str) -> None:

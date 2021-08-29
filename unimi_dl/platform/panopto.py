@@ -15,14 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with unimi-dl.  If not, see <https://www.gnu.org/licenses/>.
 
+
+from __future__ import annotations
 from .platform import Platform
 from .session_manager.unimi import UnimiSessionManager
-from __future__ import annotations
-from unimi_dl.platform.downloadable import Attachment
+from unimi_dl.downloadable import Attachment
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
-
-
 import logging
 import re
 import requests

@@ -17,12 +17,9 @@
 
 
 from __future__ import annotations
-from unimi_dl.platform.downloadable import Attachment
-from unimi_dl.platform.course import Course
 
-from .ariel import Ariel
-from .panopto import Panopto
-from .platform import Platform
+from unimi_dl.course import Course
+from unimi_dl.downloadable import Attachment
 
 
 class Platform:
@@ -48,12 +45,12 @@ class Platform:
         manifest, fetched from {url} """
         raise NotImplementedError
 
-    @staticmethod
-    def getPlatform(email: str, password: str, platform: str) -> Platform:
-        """ Factory method to create the appropriate Platform instance. """
+def getPlatform(email: str, password: str, platform: str) -> Platform:
+    """ Factory method to create the appropriate Platform instance. """
+    from unimi_dl.platform import Ariel, Panopto
 
-        if platform == 'ariel':
-            return Ariel(email, password)
-        if platform == 'panopto':
-            return Panopto(email, password)
-        raise NotImplementedError
+    if platform == 'ariel':
+        return Ariel(email, password)
+    if platform == 'panopto':
+        return Panopto(email, password)
+    raise NotImplementedError(f"platform '{platform}' is not supported")

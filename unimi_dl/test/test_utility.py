@@ -1,4 +1,4 @@
-from unimi_dl.platform.ariel import Course
+from unimi_dl.course import Course, Section
 from pathlib import Path
 import unittest
 from ..platform import Ariel
