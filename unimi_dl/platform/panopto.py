@@ -49,7 +49,10 @@ class Panopto(Platform):
         video_page = self.session.get(url).text
 
         iframe_re = re.compile(r"<iframe src=\"(.*?)\"")
-        iframe_url = iframe_re.search(video_page)[1]
+        res = iframe_re.search(video_page)
+        iframe_url = ""
+        if res is not None:
+            iframe_url = res[1]
         self.logger.debug(f"iframe URL: {iframe_url}")
         manifest_page = self.session.get(iframe_url).text
 
