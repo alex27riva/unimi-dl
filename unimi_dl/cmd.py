@@ -40,9 +40,8 @@ from .platform import getPlatform
 def get_args() -> Namespace:
     parser = ArgumentParser(
         description=f"Unimi material downloader v. {udlv}")
-    if not set(["--cleanup-downloaded", "--wipe-credentials"]) & set(sys.argv):
-        parser.add_argument("-u", "--url", metavar="URL", type=str,
-                            help="URL of the video(s) to download")
+    parser.add_argument("-u", "--url", metavar="url", type=str,
+                        help="URL of the video(s) to download")
     parser.add_argument("-p", "--platform", metavar="platform",
                         type=str, default="all", choices=AVAILABLE_PLATFORMS,
                         help="platform to download the video(s) from (default: all)")
@@ -98,32 +97,6 @@ def log_setup(verbose: bool) -> None:
     logging.basicConfig(level=logging.DEBUG, handlers=[
                         file_handler, stdout_handler])
 
-def cleanup_downloaded(downloaded_path: str) -> None:
-    main_logger = logging.getLogger(__name__)
-    downloaded_dict, downloaded_file = get_downloaded(downloaded_path)
-
-    if len(downloaded_dict) == 0:
-        main_logger.warning("The downloaded list is empty!")
-        return
-    choices = list(downloaded_dict.keys())
-    entt = list(downloaded_dict.values())
-    main_logger.debug("Prompting user")
-    try:
-        chosen = multi_select(choices, entries_text=entt,
-                              selection_text="\nVideos to remove from the downloaded list: ")
-    except WrongSelectionError:
-        main_logger.error("Your selection is not valid")
-        exit(1)
-    main_logger.debug(f"{len(chosen)} names chosen")
-    if len(chosen) != 0:
-        for manifest in chosen:
-            downloaded_dict.pop(manifest)
-        downloaded_file.seek(0)
-        downloaded_file.write(json_dumps(downloaded_dict))
-        downloaded_file.truncate()
-    downloaded_file.close()
-    main_logger.info("Cleanup done")
-
 def main():
     opts = get_args()
     if not os.path.isdir(LOCAL):
@@ -146,7 +119,6 @@ def main():
 
     main_logger.debug(f"""MODE: {"SIMULATE" if opts.simulate else "ADD TO DOWNLOADED ONLY" if opts.add_to_downloaded_only else "DOWNLOAD"}
     Request info:
-    URL: {opts.url}
     Platform: {opts.platform}
     Save: {opts.save}
     Ask: {opts.ask}
@@ -157,12 +129,12 @@ def main():
     if opts.url is not None:
         opts.url = opts.url.replace("\\", "") #sanitize url
 
-    platform = opts.platform
-    if platform == "all":
-        platform = AVAILABLE_PLATFORMS
+    platforms = opts.platform
+    if platforms == "all":
+        platforms = AVAILABLE_PLATFORMS
 
-    if not isinstance(platform, List):
-        platform = [platform]
+    if not isinstance(platforms, List):
+        platforms = [platforms]
 
     # get credentials
     credentials_manager = CredentialsManager(opts.credentials)
@@ -181,10 +153,11 @@ def main():
 
     if opts.cleanup_downloaded:
         main_logger.debug("MODE: DOWNLOADED CLEANUP")
-        chosen = multi_select(choices, entries_text=entt,
-                              selection_text="\nVideos to remove from the downloaded list: ")
-        download_manager.wipeDownloaded()
-        cleanup_downloaded(DOWNLOADED)
+        for platform in platforms:
+            downloaded = download_manager.getDownloadFrom(platform)
+            to_delete = multi_select(downloaded, entries_text=downloaded,
+                                  selection_text=f"\nVideos to remove from the '{platform}' downloaded list: ")
+            download_manager.wipeDownloaded(platform, to_delete)
         main_logger.debug(
             f"=============job end at {datetime.now()}=============\n")
         exit(0)
@@ -203,54 +176,40 @@ def main():
             f"=============job end at {datetime.now()}=============\n")
         exit(0)
 
-    platform = getPlatform(email, password, opts.platform)
-    if isinstance(platform, Ariel):
-        courses = platform.getCourses()
-        selected_courses = multi_select(courses, courses, "Scegli il corso: ") # type: list[Course]
+    for platform in platforms:
+        p = getPlatform(email, password, opts.platform)
+        if isinstance(p, Ariel):
+            courses = p.getCourses()
+            selected_courses = multi_select(courses, courses, "Scegli il corso: ") # type: list[Course]
 
-        for course in selected_courses:
-            entries = course.getSections()
-            selected_sections = multi_select(entries, entries, "Scegli le sezioni: ") # type: list[Section]
-            for section in selected_sections:
-                show(section, opts.simulate, opts.add_to_downloaded_only, opts.platform, opts.output, download_manager)
-    else:
-        pass
+            for course in selected_courses:
+                entries = course.getSections()
+                selected_sections = multi_select(entries, entries, "Scegli le sezioni: ") # type: list[Section]
+                for section in selected_sections:
+                    show(opts.simulate, opts.add_to_downloaded_only,
+                        platform, opts.output, download_manager, section)
+        elif platform == "panopto" and opts.url is not None:
+            attachments = p.getAttachments(opts.url)
+            show(opts.simulate, opts.add_to_downloaded_only,
+                platform, opts.output, download_manager,
+                additional_attachments=attachments)
+
+        else:
+            print("not supported platform")
+            exit(1)
 
     download_manager.save()
 
-#    all_manifest_dict = getPlatform(
-#        email, password, opts.platform).get_manifests(opts.url)
-#
-#    if len(all_manifest_dict) == 0:
-#        main_logger.warning("No videos found")
-#    else:
-#        if opts.all or opts.platform == "panopto":
-#            manifest_dict = all_manifest_dict
-#        else:
-#            try:
-#                selection = multi_select(
-#                    list(all_manifest_dict.keys()), selection_text="\nVideos to download: ")
-#            except WrongSelectionError:
-#                main_logger.error("Your selection is not valid")
-#                exit(1)
-#            manifest_dict = {
-#                name: all_manifest_dict[name] for name in selection}
-
-#        if len(manifest_dict) > 0:
-#            main_logger.info(f"Videos: {list(manifest_dict.keys())}")
-#
-#            downloaded_dict, downloaded_file = get_downloaded()
-#
-#            download(opts.output, manifest_dict, downloaded_dict,
-#                     downloaded_file, opts.simulate, opts.add_to_downloaded_only)
-#            downloaded_file.close()
     main_logger.debug(
         f"=============job end at {datetime.now()}=============\n")
 
-def show(section: Section, simulate: bool, add_to_downloaded_only: bool,
-    platform: str, output: str, download_manager: DownloadManager):
-    sections = section.getSubsections()
-    choices = sections + section.getAttachments() # type: ignore
+def show(simulate: bool, add_to_downloaded_only: bool,
+    platform: str, output: str, download_manager: DownloadManager,
+    section: Section = None, additional_attachments: list[Attachment] = []):
+    sections = []
+    if section is not None:
+        sections = section.getSubsections()
+    choices = sections + section.getAttachments() + additional_attachments # type: ignore
     selected_choices = multi_select(
         entries=choices,
         entries_text=choices,
@@ -258,7 +217,8 @@ def show(section: Section, simulate: bool, add_to_downloaded_only: bool,
 
     for choice in selected_choices:
         if isinstance(choice, Section):
-            show(choice, simulate, add_to_downloaded_only, platform, output, download_manager)
+            show(simulate, add_to_downloaded_only, platform, output,
+                download_manager, choice)
 
         if isinstance(choice, Attachment):
             if not simulate:
