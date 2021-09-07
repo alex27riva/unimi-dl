@@ -224,6 +224,23 @@ def findAllArielRoomsList(html: str) -> list[Tag]:
     """
     rooms = []
     page = BeautifulSoup(html, "html.parser")
+    forum_header = page.find("div", id="forum-header")
+    if isinstance(forum_header, Tag):
+        span = forum_header.find("span", class_="postbody")
+        if isinstance(span, Tag):
+            a = span.find("a")
+            if isinstance(a, Tag):
+                parent = a.parent
+                if not isinstance(parent, Tag):
+                    a.parent = Tag()
+                    parent = a.parent
+                    parent.parent = Tag()
+                parent.name = "tr"
+                tbody = parent.parent
+                if isinstance(tbody, Tag):
+                    tbody.name = "tbody"
+                    rooms.append(tbody)
+
     tbodies = page.find_all("tbody", class_="arielRoomList")
     for tbody in tbodies:
         if isinstance(tbody, Tag):

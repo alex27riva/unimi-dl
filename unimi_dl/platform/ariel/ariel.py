@@ -26,17 +26,14 @@ class Ariel(Platform):
             for course in utils.findAllCourses():
                 name, teachers, url, edition = course
                 self.courses.append(ariel_course.ArielCourse(name=name, teachers=teachers, url=url, edition=edition))
-
         return self.courses.copy() #it's a shallow copy, need a deep copy maybe?
 
     def getAttachments(self, url: str) -> list[Attachment]:
         return super().getAttachments(url)
-    #
-    # TODO: remove this
-    def get_manifests(self, url: str) -> dict[str, str]:
+
+    def get_manifests(self, url: str) -> dict[str, str]:# TODO: remove this
         self.logger.info("Getting video page")
         video_page = self.session.get(url).text
-
         self.logger.info("Collecting manifests and video names")
         res = {}
         manifest_re = re.compile(

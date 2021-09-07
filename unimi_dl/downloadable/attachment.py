@@ -29,11 +29,13 @@ class Attachment:
         result = self._download(self.url, path)
 
         if result:
-            print(f"Download completed")
-            logger.info(f"Download completed")
+            msg = f"Download {path} completed"
+            print(msg)
+            logger.info(msg)
         else:
-            print("Error occurred during download. Please retry")
-            logger.info("Error occurred during download. Please retry")
+            msg = f"Error occurred during {path} download. Please retry."
+            print(msg)
+            logger.info(msg)
 
         return result
 
