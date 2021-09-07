@@ -34,6 +34,7 @@ import os
 import platform as pt
 import sys
 
+
 def get_args() -> Namespace:
     parser = ArgumentParser(
         description=f"Unimi material downloader v. {udlv}")
@@ -127,7 +128,7 @@ def main():
     if opts.url is not None:
         opts.url = opts.url.replace("\\", "")  # sanitize url
 
-    platform = opts.platform # type: str
+    platform = opts.platform  # type: str
 
     # get credentials
     credentials_manager = CredentialsManager(opts.credentials)
@@ -170,6 +171,8 @@ def main():
         exit(0)
 
     p = getPlatform(email, password, platform)
+
+    to_download = []
     if isinstance(p, Ariel):
         courses = p.getCourses()
         selected_courses = multi_select(
@@ -180,28 +183,39 @@ def main():
             selected_sections = multi_select(
                 entries, entries, "Scegli le sezioni: ")  # type: list[Section]
             for section in selected_sections:
-                show(opts.simulate, opts.add_to_downloaded_only,
-                     platform, opts.output, download_manager, section)
+                to_download = to_download + show(section)
     elif platform == "panopto" and opts.url is not None:
         attachments = p.getAttachments(opts.url)
-        show(opts.simulate, opts.add_to_downloaded_only,
-             platform, opts.output, download_manager,
-             additional_attachments=attachments)
-
+        to_download = to_download + (show(additional_attachments=attachments))
     else:
         print("not supported platform")
         exit(1)
 
+    if not opts.simulate:
+        def download(choice: Attachment):
+            download_manager.doDownload(
+                attachment=choice,
+                dry_run=opts.add_to_downloaded_only,
+                path=opts.output,
+                platform=platform
+            )
+
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            executor.map(download,to_download)
+        
+
+    
     download_manager.save()
 
     main_logger.debug(
         f"=============job end at {datetime.now()}=============\n")
 
 
-def show(simulate: bool, add_to_downloaded_only: bool,
-         platform: str, output: str, download_manager: DownloadManager,
-         section: Section = None, additional_attachments: list[Attachment] = []):
+def show(section: Section = None,
+         additional_attachments: list[Attachment] = []) -> list[Attachment]:
     sections = []
+    result = []
     if section is not None:
         sections = section.getSubsections()
     choices = sections + section.getAttachments() + additional_attachments  # type: ignore
@@ -212,14 +226,8 @@ def show(simulate: bool, add_to_downloaded_only: bool,
 
     for choice in selected_choices:
         if isinstance(choice, Section):
-            show(simulate, add_to_downloaded_only, platform, output,
-                 download_manager, choice)
+            result = result + show(choice)
 
         if isinstance(choice, Attachment):
-            if not simulate:
-                download_manager.doDownload(
-                    attachment=choice,
-                    dry_run=add_to_downloaded_only,
-                    path=output,
-                    platform=platform
-                )
+            result.append(choice)
+    return result

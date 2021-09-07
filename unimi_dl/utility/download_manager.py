@@ -60,7 +60,9 @@ class DownloadManager:
         - to change, need a better way to handle type hinting
         """
         l = getattr(self.downloaded, platform) # type: list[str]
-        if attachment.url not in l or force: # check if it's already downloaded
+        if not isinstance(attachment, Attachment):
+            raise Exception(f"{attachment} is not an Attachment")
+        if attachment.url not in l or force:
             if dry_run or attachment.download(path):
                 l.append(attachment.url)
                 setattr(self.downloaded, platform, l)
