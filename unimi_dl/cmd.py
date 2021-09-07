@@ -136,10 +136,10 @@ def main():
     email = credentials.email
     password = credentials.password
     if opts.ask or email is None or password is None:
-        main_logger.info(f"Asking credentials")
-        print(f"Insert credentials")
-        email = input(f"username/email: ")
-        password = getpass(f"password (input won't be shown): ")
+        main_logger.info("Asking credentials")
+        print("Insert credentials")
+        email = input("username/email: ")
+        password = getpass("password (input won't be shown): ")
         if opts.save:
             credentials_manager.setCredentials(email, password)
 
@@ -152,9 +152,7 @@ def main():
             to_delete = multi_select(downloaded, entries_text=downloaded,
                                      selection_text=f"\nVideos to remove from the '{platform}' downloaded list: ")
             download_manager.wipeDownloaded(platform, to_delete)
-        main_logger.debug(
-            f"=============job end at {datetime.now()}=============\n")
-        exit(0)
+
     elif opts.wipe_credentials:
         main_logger.debug("MODE: WIPE CREDENTIALS")
         main_logger.debug("Prompting user")
@@ -166,47 +164,43 @@ def main():
         else:
             main_logger.info("Credentials file kept")
 
-        main_logger.debug(
-            f"=============job end at {datetime.now()}=============\n")
-        exit(0)
-
-    p = getPlatform(email, password, platform)
-
-    to_download = []
-    if isinstance(p, Ariel):
-        courses = p.getCourses()
-        selected_courses = multi_select(
-            courses, courses, "Scegli il corso: ")  # type: list[Course]
-
-        for course in selected_courses:
-            entries = course.getSections()
-            selected_sections = multi_select(
-                entries, entries, "Scegli le sezioni: ")  # type: list[Section]
-            for section in selected_sections:
-                to_download = to_download + show(section)
-    elif platform == "panopto" and opts.url is not None:
-        attachments = p.getAttachments(opts.url)
-        to_download = to_download + (show(additional_attachments=attachments))
     else:
-        print("not supported platform")
-        exit(1)
+        p = getPlatform(email, password, platform)
 
-    if not opts.simulate:
-        def download(choice: Attachment):
-            download_manager.doDownload(
-                attachment=choice,
-                dry_run=opts.add_to_downloaded_only,
-                path=opts.output,
-                platform=platform
-            )
+        to_download = []
+        if isinstance(p, Ariel):
+            courses = p.getCourses()
+            selected_courses = multi_select(
+                courses, courses, "Scegli il corso: ")  # type: list[Course]
 
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            executor.map(download,to_download)
-        
+            for course in selected_courses:
+                entries = course.getSections()
+                selected_sections = multi_select(
+                    entries, entries, "Scegli le sezioni: ")  # type: list[Section]
+                for section in selected_sections:
+                    to_download = to_download + show(section)
+        elif platform == "panopto" and opts.url is not None:
+            attachments = p.getAttachments(opts.url)
+            to_download = to_download + \
+                (show(additional_attachments=attachments))
+        else:
+            print("not supported platform")
+            exit(1)
 
-    
-    download_manager.save()
+        if not opts.simulate:
+            def download(choice: Attachment):
+                download_manager.doDownload(
+                    attachment=choice,
+                    dry_run=opts.add_to_downloaded_only,
+                    path=opts.output,
+                    platform=platform
+                )
+
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                executor.map(download, to_download)
+
+        download_manager.save()
 
     main_logger.debug(
         f"=============job end at {datetime.now()}=============\n")
