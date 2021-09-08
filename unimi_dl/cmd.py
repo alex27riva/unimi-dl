@@ -78,6 +78,7 @@ def log_setup(verbose: bool) -> None:
     # setting up stdout handler
     stdout_handler = logging.StreamHandler(sys.stdout)
     if verbose:
+        logging.getLogger("youtube-dl").setLevel(logging.INFO)
         stdout_handler.setLevel(logging.INFO)
         stdout_handler.setFormatter(
             logging.Formatter("%(message)s"))

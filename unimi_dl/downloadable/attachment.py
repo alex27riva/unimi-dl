@@ -25,7 +25,9 @@ class Attachment:
     def download(self, path_prefix: str) -> bool:
         import os
         path = os.path.join(path_prefix, self.name)
-        logger.info(f"Downloading '{path}'")
+        msg = f"Downloading '{path}'"
+        logger.info(msg)
+        print(msg)
         result = self._download(self.url, path)
 
         if result:

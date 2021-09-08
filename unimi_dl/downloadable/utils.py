@@ -4,12 +4,15 @@ from unimi_dl.platform.session_manager.unimi import UnimiSessionManager
 def download_by_ydl(url: str, path: str) -> bool:
     import youtube_dl
 
+    logger = logging.getLogger("youtube-dl")
     ydl_opts = {
         "v": "true",
         "nocheckcertificate": "true",
         "restrictfilenames": "true",
-        "logger": logging.getLogger("youtube-dl")
+        "logger": logger,
+        "quiet": logger.level != logging.INFO
     }
+
     ydl_opts["outtmpl"] = path + ".%(ext)s"
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
