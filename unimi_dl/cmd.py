@@ -147,11 +147,10 @@ def main():
 
     if opts.cleanup_downloaded:
         main_logger.debug("MODE: DOWNLOADED CLEANUP")
-        for platform in platform:
-            downloaded = download_manager.getDownloadFrom(platform)
-            to_delete = multi_select(downloaded, entries_text=downloaded,
-                                     selection_text=f"\nVideos to remove from the '{platform}' downloaded list: ")
-            download_manager.wipeDownloaded(platform, to_delete)
+        downloaded = download_manager.getDownloadFrom(platform)
+        to_delete = multi_select(downloaded, entries_text=downloaded,
+                                 selection_text=f"\nVideos to remove from the '{platform}' downloaded list: ")
+        download_manager.wipeDownloaded(platform, to_delete)
 
     elif opts.wipe_credentials:
         main_logger.debug("MODE: WIPE CREDENTIALS")
