@@ -1,8 +1,7 @@
 import logging
 from urllib.parse import urlparse
 
-from .utils import download_by_requests
-from .utils import download_by_ydl
+import unimi_dl.downloadable.utils as utils
 
 logger = logging.getLogger(__name__)
 
@@ -10,14 +9,15 @@ logger = logging.getLogger(__name__)
 class Attachment:
     def __init__(self, name: str, filetype: str, url: str, section_name: str, description: str = "") -> None:
         self.section_name = section_name
-        self.name = name
+        sane_name = utils.sanitize(name)
+        self.name = sane_name
         self.url = urlparse(url).geturl()
         self.description = description
         self.filetype = filetype
         if self.filetype == "video":
-            self._download = download_by_ydl
+            self._download = utils.download_by_ydl
         elif self.filetype == "document":
-            self._download = download_by_requests
+            self._download = utils.download_by_requests
         else:
             raise NotImplementedError(
                 f"{self.filetype} filetype download not supported")
@@ -42,7 +42,7 @@ class Attachment:
         return result
 
     def __repr__(self) -> str:
-        return "{name}".format(name=self.name)
+        return f"{self.name}"
 
     def __str__(self) -> str:
-        return "{name}".format(name=self.name)
+        return f"{self.name}"
