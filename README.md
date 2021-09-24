@@ -50,14 +50,19 @@ unimi-dl --help
 
 ### Clonando con git
 - Installa git se non presente
-- Installa le [dipendenze](#Dipendenze) se non presenti
 - Clona la repo:
 ```
-git clone https://github.com/SimpoLab/unimi-dl.git
+git clone https://github.com/SimpoLab/unimi-dl.git && cd unimi-dl
 ```
+  - Se avete venv di Python installato (consigliato):
+
+      `python -m venv .`
+      pip install .
+
+  - Installa le [dipendenze](#Dipendenze) se non presenti
+
 - Usa il software dalla directory della repo:
 ```
-cd unimi-dl
 python3 -m unimi_dl --help
 ```
 Nota: con questo metodo è necessario tenere la repo clonata per fare uso del software.
