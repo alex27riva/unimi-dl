@@ -1,3 +1,4 @@
+from json.decoder import JSONDecodeError
 import logging
 
 from pathlib import Path
@@ -17,9 +18,17 @@ class CredentialsManager:
     """
     def __init__(self, cred_path: str) -> None:
         self.path = Path(cred_path).expanduser()
-        with(self.path.open("r") as credentials_file):
-            credentials_dict = json_load(credentials_file)
-            self.credentials = Credentials(credentials_dict["email"], credentials_dict["password"])
+        if not self.path.is_file():
+            with(self.path.open("w") as credentials_file): #create file
+                pass
+        else:
+            with(self.path.open("r") as credentials_file):
+                try:
+                    credentials_dict = json_load(credentials_file)
+                    self.credentials = Credentials(credentials_dict["email"], credentials_dict["password"])
+                except JSONDecodeError:
+                    self.credentials = Credentials("", "")
+
 
     def setCredentials(self, email: str, password: str):
         """
@@ -30,7 +39,7 @@ class CredentialsManager:
         credentials.password = password
 
         with(self.path.open("w") as credentials_file):
-            credentials_file.write(json_dumps(self.credentials))
+            credentials_file.write(json_dumps(self.credentials.__dict__))
             main_logger.info(
                 f"Credentials saved succesfully in {str(self.path)}")
 
