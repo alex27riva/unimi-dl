@@ -38,7 +38,7 @@ class ArielSection(Section):
                 if isinstance(thread, Tag):
                     trs = utils.findAllRows(thread)
                     for tr in trs:
-                        self.attachments = self.attachments + utils.findAllAttachments(tr, self.base_url)
+                        self.attachments = self.attachments + utils.findAllAttachments(tr, self.base_url,self.name)
 
             self.has_attachments = True
         return self.attachments.copy()

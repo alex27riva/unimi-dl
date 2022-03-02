@@ -175,10 +175,15 @@ def main():
 
             for course in selected_courses:
                 entries = course.getSections()
-                selected_sections = multi_select(
-                    entries, entries, "Scegli le sezioni: ")  # type: list[Section]
+                selected_sections = []
+
+                if opts.all:
+                    selected_sections = entries
+                else:
+                    selected_sections = multi_select(
+                            entries, entries, "Scegli le sezioni: ")  # type: list[Section]
                 for section in selected_sections:
-                    to_download = to_download + show(section)
+                    to_download = to_download + show(section, all=opts.all)
         elif platform == "panopto" and opts.url is not None:
             attachments = p.getAttachments(opts.url)
             to_download = to_download + \
@@ -207,20 +212,24 @@ def main():
 
 
 def show(section: Section = None,
-         additional_attachments: list[Attachment] = []) -> list[Attachment]:
+        additional_attachments: list[Attachment] = [], all: bool = False) -> list[Attachment]:
     sections = []
     result = []
     if section is not None:
         sections = section.getSubsections()
     choices = sections + section.getAttachments() + additional_attachments  # type: ignore
-    selected_choices = multi_select(
-        entries=choices,
-        entries_text=choices,
-        selection_text="Scegli un file o una sezione ")
+    selected_choices = []
+    if all:
+        selected_choices = choices
+    else:
+        selected_choices = multi_select(
+                entries=choices,
+                entries_text=choices,
+                selection_text="Scegli un file o una sezione ")
 
     for choice in selected_choices:
         if isinstance(choice, Section):
-            result = result + show(choice)
+            result = result + show(choice, all=all)
 
         if isinstance(choice, Attachment):
             result.append(choice)

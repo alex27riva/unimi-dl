@@ -33,14 +33,14 @@ def findAllRows(tbody: Tag) -> list[Tag]:
             result.append(tr)
     return result
 
-def findAllAttachments(tr: Tag, base_url: str) -> list[Attachment]:
+def findAllAttachments(tr: Tag, base_url: str, section_name: str) -> list[Attachment]:
     attachments = []
-    videos = findAllVideos(tr)
-    documents = findAllDocuments(tr, base_url)
+    videos = findAllVideos(tr, section_name)
+    documents = findAllDocuments(tr, base_url, section_name)
     attachments = attachments + videos + documents
     return attachments
 
-def findAllVideos(tr: Tag) -> list[Attachment]:
+def findAllVideos(tr: Tag, section_name: str) -> list[Attachment]:
     """
     Retrieves all the <video> in the `tr` abd creates an `Attachment` using:
         `name`: extracts the name from the `url`, which is the `manifest.m3u8`
@@ -60,7 +60,6 @@ def findAllVideos(tr: Tag) -> list[Attachment]:
         name = name.split("mp4:")[-1]
         name = name.split("/")[-1]
 
-        section_name = ""
         description = findPostDescription(tr)
         attachments.append(Attachment(
             name=name,
@@ -86,7 +85,7 @@ def findVideoUrl(video: Tag) -> str:
 
     return url
 
-def findAllDocuments(tr: Tag, base_url: str) -> list[Attachment]:
+def findAllDocuments(tr: Tag, base_url: str, section_name: str) -> list[Attachment]:
     attachments = []
     a_tags = tr.find_all("a", class_=["filename"])
     if a_tags:
@@ -101,7 +100,6 @@ def findAllDocuments(tr: Tag, base_url: str) -> list[Attachment]:
 
         name = findDocumentName(a)
         url = base_url + API + getTagHref(a)[8:] #excluding ../frm3 from the url
-        section_name = ""
         description = findPostDescription(tr)
         attachments.append(Attachment(
             name=name,

@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class Attachment:
     def __init__(self, name: str, filetype: str, url: str, section_name: str, description: str = "") -> None:
-        self.section_name = section_name
+        self.section_name = section_name.strip()
         sane_name = utils.sanitize(name)
         self.name = sane_name
         self.url = urlparse(url).geturl()
@@ -24,7 +24,9 @@ class Attachment:
 
     def download(self, path_prefix: str) -> bool:
         import os
-        path = os.path.join(path_prefix, self.name)
+        path = os.path.join(path_prefix, self.section_name)
+        os.makedirs(path, exist_ok=True)
+        path = os.path.join(path, self.name)
         msg = f"Downloading '{path}'"
         logger.info(msg)
         print(msg)
